@@ -284,8 +284,8 @@ export default function Home() {
                               onClick={() => handleDownload('csv')}
                               title="Download as CSV file"
                               size="small"
-                              startIcon={<DownloadIcon />}
                               endIcon={<TableViewIcon />}
+                              sx={{ minWidth: '100px', width: '100px' }}
                           >
                             CSV
                           </Button>
@@ -294,8 +294,8 @@ export default function Home() {
                               onClick={() => handleDownload('tsv')}
                               title="Download as TSV file"
                               size="small"
-                              startIcon={<DownloadIcon />}
                               endIcon={<GridOnIcon />}
+                              sx={{ minWidth: '100px', width: '100px' }}
                           >
                             TSV
                           </Button>
@@ -304,8 +304,8 @@ export default function Home() {
                               onClick={() => handleDownload('json')}
                               title="Download as JSON file"
                               size="small"
-                              startIcon={<DownloadIcon />}
                               endIcon={<CodeIcon />}
+                              sx={{ minWidth: '100px', width: '100px' }}
                           >
                             JSON
                           </Button>
@@ -314,8 +314,8 @@ export default function Home() {
                               onClick={() => handleDownload('excel')}
                               title="Download as Excel file"
                               size="small"
-                              startIcon={<DownloadIcon />}
                               endIcon={<InsertDriveFileIcon />}
+                              sx={{ minWidth: '100px', width: '100px' }}
                           >
                             Excel
                           </Button>
