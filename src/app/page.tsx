@@ -11,6 +11,11 @@ import {
   CircularProgress,
   Alert
 } from '@mui/material';
+import DownloadIcon from '@mui/icons-material/Download';
+import TableViewIcon from '@mui/icons-material/TableView';
+import GridOnIcon from '@mui/icons-material/GridOn';
+import CodeIcon from '@mui/icons-material/Code';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import FileUpload from '@/components/FileUpload';
 import TransformationPreview from '@/components/TransformationPreview';
 import Header from '@/components/Header';
@@ -127,24 +132,86 @@ export default function Home() {
     }
   };
 
-  const handleDownload = () => {
-    if (!transformedData.length) return;
+  const handleDownload = (format: 'csv' | 'tsv' | 'json' | 'excel' = 'csv') => {
+    if (!transformedData.length || !fileData) return;
 
-    let content: string;
-    const fileExtension = fileName.split('.').pop()?.toLowerCase() || 'txt';
+    let content: string | Blob;
+    let mimeType: string;
+    let outputExtension: string = format;
 
-    if (fileExtension === 'csv' || fileExtension === 'tsv') {
-      const delimiter = fileExtension === 'csv' ? ',' : '\t';
-      content = transformedData.map(row => row.join(delimiter)).join('\n');
-    } else {
-      content = transformedData.map(row => row.join('\t')).join('\n');
+    switch (format) {
+      case 'csv':
+        content = transformedData.map(row => row.join(',')).join('\n');
+        mimeType = 'text/csv';
+        break;
+      case 'tsv':
+        content = transformedData.map(row => row.join('\t')).join('\n');
+        mimeType = 'text/tab-separated-values';
+        break;
+      case 'json':
+        // Create JSON with headers as keys
+        const jsonData = transformedData.map(row => {
+          const rowObj: Record<string, string> = {};
+          fileData.headers.forEach((header, index) => {
+            rowObj[header] = row[index] || '';
+          });
+          return rowObj;
+        });
+        content = JSON.stringify(jsonData, null, 2);
+        mimeType = 'application/json';
+        break;
+      case 'excel':
+        // Create Excel file using the xlsx library
+        import('xlsx').then(XLSX => {
+          // Create a new workbook
+          const wb = XLSX.utils.book_new();
+
+          // Add headers as the first row of data
+          const excelData = [fileData.headers, ...transformedData];
+
+          // Create a worksheet from the data
+          const ws = XLSX.utils.aoa_to_sheet(excelData);
+
+          // Add the worksheet to the workbook
+          XLSX.utils.book_append_sheet(wb, ws, "Transformed Data");
+
+          // Generate Excel file
+          const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+
+          // Create a Blob from the buffer
+          const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+          // Create a filename with the xlsx extension
+          const baseName = fileName.split('.')[0] || 'transformed_data';
+          const excelFilename = `${baseName}_transformed.xlsx`;
+
+          // Trigger download
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = excelFilename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        });
+        return; // Early return since Excel handling is async
+      default:
+        content = transformedData.map(row => row.join(',')).join('\n');
+        mimeType = 'text/csv';
+        outputExtension = 'csv';
     }
 
-    const blob = new Blob([content], { type: 'text/plain' });
+    // Create a filename with the new extension
+    const baseName = fileName.split('.')[0] || 'transformed_data';
+    const outputFilename = `${baseName}_transformed.${outputExtension}`;
+
+    // For non-Excel formats (which return early)
+    const blob = new Blob([content as string], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `transformed_${fileName}`;
+    a.download = outputFilename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -191,7 +258,7 @@ export default function Home() {
                       sx={{ mb: 2 }}
                   />
 
-                  <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+                  <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
                     <Button
                         variant="contained"
                         onClick={handleTransform}
@@ -206,13 +273,54 @@ export default function Home() {
                     >
                       Transform All Data
                     </Button>
-                    <Button
-                        variant="outlined"
-                        onClick={handleDownload}
-                        disabled={!transformedData.length}
-                    >
-                      Download Result
-                    </Button>
+
+                    {transformedData.length > 0 && (
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Typography variant="body2" sx={{ mr: 1, alignSelf: 'center' }}>
+                            Download as:
+                          </Typography>
+                          <Button
+                              variant="outlined"
+                              onClick={() => handleDownload('csv')}
+                              title="Download as CSV file"
+                              size="small"
+                              startIcon={<DownloadIcon />}
+                              endIcon={<TableViewIcon />}
+                          >
+                            CSV
+                          </Button>
+                          <Button
+                              variant="outlined"
+                              onClick={() => handleDownload('tsv')}
+                              title="Download as TSV file"
+                              size="small"
+                              startIcon={<DownloadIcon />}
+                              endIcon={<GridOnIcon />}
+                          >
+                            TSV
+                          </Button>
+                          <Button
+                              variant="outlined"
+                              onClick={() => handleDownload('json')}
+                              title="Download as JSON file"
+                              size="small"
+                              startIcon={<DownloadIcon />}
+                              endIcon={<CodeIcon />}
+                          >
+                            JSON
+                          </Button>
+                          <Button
+                              variant="outlined"
+                              onClick={() => handleDownload('excel')}
+                              title="Download as Excel file"
+                              size="small"
+                              startIcon={<DownloadIcon />}
+                              endIcon={<InsertDriveFileIcon />}
+                          >
+                            Excel
+                          </Button>
+                        </Box>
+                    )}
                   </Box>
 
                   {isLoading && (
