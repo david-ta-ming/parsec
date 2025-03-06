@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import OpenAI, {ChatCompletionCreateParamsNonStreaming} from 'openai';
+import logger from '@/utils/logger';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -7,7 +8,9 @@ const openai = new OpenAI({
 });
 
 export async function POST(req: NextRequest) {
+
     try {
+
         const { data, headers, transformationPrompt } = await req.json();
 
         if (!data || !Array.isArray(data) || data.length === 0) {
@@ -52,8 +55,8 @@ Transform ALL rows according to the instructions. Return ONLY the transformed da
             const batch = data.slice(i, Math.min(i + batchSize, data.length));
             const batchDataStr = batch.map(row => row.join(',')).join('\n');
 
-            const response = await openai.chat.completions.create({
-                model: 'gpt-3.5-turbo', // Use the appropriate model
+            const requestPayload: ChatCompletionCreateParamsNonStreaming = {
+                model: 'gpt-4o-mini',
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: userPrompt },
@@ -61,7 +64,11 @@ Transform ALL rows according to the instructions. Return ONLY the transformed da
                 ],
                 temperature: 0, // Use zero temperature for deterministic results
                 max_tokens: 2000,
-            });
+            };
+
+            logger.debug('Sending OpenAI request', requestPayload);
+
+            const response = await openai.chat.completions.create(requestPayload);
 
             const transformedText = response.choices[0].message.content?.trim() || '';
 
