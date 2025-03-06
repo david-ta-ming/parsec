@@ -28,7 +28,7 @@ Parsec is an AI-powered data transformation tool that allows users to transform 
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/parsec.git
+   git clone https://github.com/david-ta-ming/parsec.git
    cd parsec
    ```
 

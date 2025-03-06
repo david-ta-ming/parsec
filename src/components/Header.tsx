@@ -27,7 +27,7 @@ export default function Header() {
                         <Button
                             color="inherit"
                             startIcon={<GitHubIcon />}
-                            href="https://github.com/your-username/parsec"
+                            href="https://github.com/david-ta-ming/parsec"
                             target="_blank"
                             rel="noopener noreferrer"
                             sx={{ textTransform: 'none' }}
