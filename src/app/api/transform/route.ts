@@ -27,7 +27,8 @@ export async function POST(req: NextRequest) {
         // Build the prompt for OpenAI
         const systemPrompt = `You are a data transformation assistant. Your task is to transform each row of data according to these instructions: "${transformationPrompt}".
 Provide ONLY the transformed data values. Do not include explanations or descriptions.
-Maintain the same number of columns for each row.`;
+Maintain the same number of columns for each row.
+For date calculations, use standard algorithms and be perfectly consistent in your transformations.`;
 
         // Convert the data to a string format that's easier for the model to understand
         const headerStr = headers.join(',');
@@ -58,7 +59,7 @@ Transform ALL rows according to the instructions. Return ONLY the transformed da
                     { role: 'user', content: userPrompt },
                     { role: 'user', content: `Transform these rows:\n${batchDataStr}` }
                 ],
-                temperature: 0.3, // Lower temperature for more consistent results
+                temperature: 0, // Use zero temperature for deterministic results
                 max_tokens: 2000,
             });
 
