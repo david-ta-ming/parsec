@@ -40,8 +40,8 @@ export default function TransformationPreview({ originalData, transformedData }:
             </Typography>
 
             <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 2 }}>
-                <Tab label="Original Data" />
                 <Tab label="Transformed Data" />
+                <Tab label="Original Data" />
                 <Tab label="Side by Side" />
             </Tabs>
 
@@ -51,13 +51,15 @@ export default function TransformationPreview({ originalData, transformedData }:
                         <TableHead>
                             <TableRow>
                                 <TableCell>#</TableCell>
-                                {originalData.headers.map((header, index) => (
-                                    <TableCell key={index}>{header}</TableCell>
+                                {transformedDisplayData[0]?.map((_, index) => (
+                                    <TableCell key={index}>
+                                        {originalData.headers[index] || `Column ${index + 1}`}
+                                    </TableCell>
                                 ))}
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {originalDisplayData.map((row, rowIndex) => (
+                            {transformedDisplayData.map((row, rowIndex) => (
                                 <TableRow key={rowIndex}>
                                     <TableCell>{rowIndex + 1}</TableCell>
                                     {row.map((cell, cellIndex) => (
@@ -76,15 +78,13 @@ export default function TransformationPreview({ originalData, transformedData }:
                         <TableHead>
                             <TableRow>
                                 <TableCell>#</TableCell>
-                                {transformedDisplayData[0]?.map((_, index) => (
-                                    <TableCell key={index}>
-                                        {originalData.headers[index] || `Column ${index + 1}`}
-                                    </TableCell>
+                                {originalData.headers.map((header, index) => (
+                                    <TableCell key={index}>{header}</TableCell>
                                 ))}
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {transformedDisplayData.map((row, rowIndex) => (
+                            {originalDisplayData.map((row, rowIndex) => (
                                 <TableRow key={rowIndex}>
                                     <TableCell>{rowIndex + 1}</TableCell>
                                     {row.map((cell, cellIndex) => (
