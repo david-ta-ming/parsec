@@ -1,0 +1,31 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "ERROR: OPENAI_API_KEY environment variable is not set"
+            exit 1
+          else
+            echo "✅ OPENAI_API_KEY is set"
+          fi
+        - |
+          if [ -z "$LOG_LEVEL" ]; then
+            echo "WARNING: LOG_LEVEL environment variable is not set, using default"
+          else
+            echo "✅ LOG_LEVEL is set to $LOG_LEVEL"
+          fi
+        - yarn install
+    build:
+      commands:
+        - env | grep -e OPENAI_API_KEY -e LOG_LEVEL >> .env.production
+        - yarn run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - .next/cache/**/*
+      - node_modules/**/*
