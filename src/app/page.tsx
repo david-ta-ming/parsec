@@ -59,7 +59,7 @@ function TabPanel(props: TabPanelProps) {
 export default function Home() {
     const [fileData, setFileData] = useState<FileData | null>(null);
     const [fileName, setFileName] = useState<string>('');
-    const [fileType, setFileType] = useState<string>('');
+    const [, setFileType] = useState<string>('');
     const [transformedData, setTransformedData] = useState<string[][]>([]);
     const [transformationPrompt, setTransformationPrompt] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -379,8 +379,8 @@ export default function Home() {
 
                             {!allDataTransformed && transformedData.length > 0 && (
                                 <Alert severity="info" sx={{mt: 2, mb: 2}}>
-                                    You're viewing a preview of the transformation. Click "Transform All Data" to
-                                    process the entire dataset, after which you'll be able to download the result.
+                                    You&#39;re viewing a preview of the transformation. Click &#34;Transform All Data&#34; to
+                                    process the entire dataset, after which you&#39;ll be able to download the result.
                                 </Alert>
                             )}
 
