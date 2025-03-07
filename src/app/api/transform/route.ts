@@ -82,6 +82,8 @@ Transform ALL rows according to the instructions. Return ONLY the transformed da
 
             const response = await openai.chat.completions.create(requestPayload);
 
+            logger.debug('Received OpenAI response', response.choices[0]);
+
             const transformedText = response.choices[0].message.content?.trim() || '';
 
             // Custom CSV parsing that respects quoted values

@@ -181,7 +181,7 @@ export default function Home() {
             setIsTransformingFullData(false);
         }
     };
-    
+
     const handleDownload = async (format: 'csv' | 'tsv' | 'json' | 'excel' = 'csv') => {
         if (!fileData) return;
 
