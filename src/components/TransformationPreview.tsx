@@ -1,4 +1,4 @@
-// Modified TransformationPreview.tsx
+// Updated TransformationPreview.tsx
 import {
     Box,
     Table,
@@ -22,6 +22,9 @@ export default function TransformationPreview({ originalData, transformedData }:
     const displayRowCount = Math.min(10, originalData.data.length, transformedData.length);
     const transformedDisplayData = transformedData.slice(0, displayRowCount);
 
+    // Ensure the headers match the original headers
+    const displayHeaders = originalData.headers.map(header => header || '');
+
     return (
         <Box sx={{ mb: 4 }}>
             <Typography variant="h6" gutterBottom>
@@ -33,9 +36,9 @@ export default function TransformationPreview({ originalData, transformedData }:
                     <TableHead>
                         <TableRow>
                             <TableCell>#</TableCell>
-                            {transformedDisplayData[0]?.map((_, index) => (
+                            {displayHeaders.map((header, index) => (
                                 <TableCell key={index}>
-                                    {originalData.headers[index] || `Column ${index + 1}`}
+                                    {header || `Column ${index + 1}`}
                                 </TableCell>
                             ))}
                         </TableRow>
@@ -44,9 +47,17 @@ export default function TransformationPreview({ originalData, transformedData }:
                         {transformedDisplayData.map((row, rowIndex) => (
                             <TableRow key={rowIndex}>
                                 <TableCell>{rowIndex + 1}</TableCell>
-                                {row.map((cell, cellIndex) => (
-                                    <TableCell key={cellIndex}>{cell}</TableCell>
-                                ))}
+                                {row.map((cell, cellIndex) => {
+                                    // Only show data for columns that exist in the original headers
+                                    if (cellIndex < displayHeaders.length) {
+                                        return (
+                                            <TableCell key={cellIndex}>
+                                                {cell}
+                                            </TableCell>
+                                        );
+                                    }
+                                    return null;
+                                })}
                             </TableRow>
                         ))}
                     </TableBody>

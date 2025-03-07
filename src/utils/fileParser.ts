@@ -35,12 +35,13 @@ export const parseFile = async (file: File, options?: ParseOptions): Promise<Fil
     }
 };
 
+// Fix for src/utils/fileParser.ts - Update the parseCsv function
+
 const parseCsv = async (file: File, delimiter: string, hasHeaders: boolean): Promise<FileData> => {
     const text = await file.text();
     const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
 
-    // CSV can have quoted values containing delimiters
-    // This is a simple parser that might not handle all CSV edge cases
+    // Improved CSV parser that properly handles quoted values
     const parseCSVLine = (line: string): string[] => {
         const result: string[] = [];
         let inQuotes = false;
@@ -48,13 +49,23 @@ const parseCsv = async (file: File, delimiter: string, hasHeaders: boolean): Pro
 
         for (let i = 0; i < line.length; i++) {
             const char = line[i];
+            const nextChar = line[i + 1];
 
             if (char === '"') {
-                inQuotes = !inQuotes;
+                // Handle escaped quotes (two double quotes in a row)
+                if (nextChar === '"') {
+                    currentValue += '"';
+                    i++; // Skip the next quote
+                } else {
+                    // Toggle quote state
+                    inQuotes = !inQuotes;
+                }
             } else if (char === delimiter && !inQuotes) {
+                // We found a delimiter not inside quotes
                 result.push(currentValue);
                 currentValue = '';
             } else {
+                // Regular character
                 currentValue += char;
             }
         }
