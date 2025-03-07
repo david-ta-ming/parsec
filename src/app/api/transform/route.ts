@@ -9,6 +9,9 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || '',
 });
 
+// Get the model from environment variables or use a default
+const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+
 export async function POST(req: NextRequest) {
 
     // Check if API key is available
@@ -78,7 +81,7 @@ Transform ALL rows according to the instructions. Return ONLY the transformed da
             const batchDataStr = batch.map(row => row.join(',')).join('\n');
 
             const requestPayload = {
-                model: 'gpt-4o-mini',
+                model: MODEL,
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: userPrompt },
