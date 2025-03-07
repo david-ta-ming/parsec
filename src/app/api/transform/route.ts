@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI, {ChatCompletionCreateParamsNonStreaming} from 'openai';
+import OpenAI from 'openai';
 import logger from '@/utils/logger';
 
 // Initialize OpenAI client
@@ -61,7 +61,7 @@ Transform ALL rows according to the instructions. Return ONLY the transformed da
             const batch = data.slice(i, Math.min(i + batchSize, data.length));
             const batchDataStr = batch.map(row => row.join(',')).join('\n');
 
-            const requestPayload: ChatCompletionCreateParamsNonStreaming = {
+            const requestPayload: OpenAI.ChatCompletionCreateParamsNonStreaming = {
                 model: 'gpt-4o-mini',
                 messages: [
                     { role: 'system', content: systemPrompt },
