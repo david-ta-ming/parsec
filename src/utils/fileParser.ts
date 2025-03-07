@@ -3,31 +3,39 @@ import * as XLSX from 'xlsx';
 export interface FileData {
     headers: string[];
     data: string[][];
+    hasHeaders: boolean; // New flag to indicate if the file had original headers
 }
 
-export const parseFile = async (file: File): Promise<FileData> => {
+export interface ParseOptions {
+    hasHeaders?: boolean; // Optional parameter to specify if file has headers
+}
+
+export const parseFile = async (file: File, options?: ParseOptions): Promise<FileData> => {
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
     if (!fileExtension) {
         throw new Error('Unable to determine file type');
     }
 
+    // Default assumption is that files have headers unless specified otherwise
+    const hasHeaders = options?.hasHeaders !== undefined ? options.hasHeaders : true;
+
     switch (fileExtension) {
         case 'csv':
-            return parseCsv(file, ',');
+            return parseCsv(file, ',', hasHeaders);
         case 'tsv':
-            return parseCsv(file, '\t');
+            return parseCsv(file, '\t', hasHeaders);
         case 'txt':
-            return parseTxt(file);
+            return parseTxt(file, hasHeaders);
         case 'xlsx':
         case 'xls':
-            return parseExcel(file);
+            return parseExcel(file, hasHeaders);
         default:
             throw new Error(`Unsupported file type: .${fileExtension}`);
     }
 };
 
-const parseCsv = async (file: File, delimiter: string): Promise<FileData> => {
+const parseCsv = async (file: File, delimiter: string, hasHeaders: boolean): Promise<FileData> => {
     const text = await file.text();
     const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
 
@@ -58,16 +66,31 @@ const parseCsv = async (file: File, delimiter: string): Promise<FileData> => {
     };
 
     if (lines.length === 0) {
-        return { headers: [], data: [] };
+        return { headers: [], data: [], hasHeaders };
     }
 
-    const headers = parseCSVLine(lines[0]);
-    const rowData = lines.slice(1).map(line => parseCSVLine(line));
+    let headers: string[] = [];
+    let rowData: string[][] = [];
 
-    return { headers, data: rowData };
+    if (hasHeaders) {
+        // If file has headers, use the first line as headers
+        headers = parseCSVLine(lines[0]);
+        rowData = lines.slice(1).map(line => parseCSVLine(line));
+    } else {
+        // If file has no headers, generate headers and use all lines as data
+        rowData = lines.map(line => parseCSVLine(line));
+
+        // Generate default column headers based on first row
+        if (rowData.length > 0) {
+            const columnCount = rowData[0].length;
+            headers = Array.from({ length: columnCount }, (_, i) => `Column ${i + 1}`);
+        }
+    }
+
+    return { headers, data: rowData, hasHeaders };
 };
 
-const parseTxt = async (file: File): Promise<FileData> => {
+const parseTxt = async (file: File, hasHeaders: boolean): Promise<FileData> => {
     const text = await file.text();
     const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
 
@@ -93,16 +116,29 @@ const parseTxt = async (file: File): Promise<FileData> => {
     }
 
     if (lines.length === 0) {
-        return { headers: [], data: [] };
+        return { headers: [], data: [], hasHeaders };
     }
 
-    const headers = lines[0].split(delimiter);
-    const rowData = lines.slice(1).map(line => line.split(delimiter));
+    let headers: string[] = [];
+    let rowData: string[][] = [];
 
-    return { headers, data: rowData };
+    if (hasHeaders) {
+        headers = lines[0].split(delimiter);
+        rowData = lines.slice(1).map(line => line.split(delimiter));
+    } else {
+        rowData = lines.map(line => line.split(delimiter));
+
+        // Generate default column headers based on first row
+        if (rowData.length > 0) {
+            const columnCount = rowData[0].length;
+            headers = Array.from({ length: columnCount }, (_, i) => `Column ${i + 1}`);
+        }
+    }
+
+    return { headers, data: rowData, hasHeaders };
 };
 
-const parseExcel = async (file: File): Promise<FileData> => {
+const parseExcel = async (file: File, hasHeaders: boolean): Promise<FileData> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
 
@@ -119,17 +155,33 @@ const parseExcel = async (file: File): Promise<FileData> => {
                 const jsonData = XLSX.utils.sheet_to_json<any>(worksheet, { header: 1 });
 
                 if (jsonData.length === 0) {
-                    resolve({ headers: [], data: [] });
+                    resolve({ headers: [], data: [], hasHeaders });
                     return;
                 }
 
-                // Extract headers and data
-                const headers = (jsonData[0] as any[]).map(h => h?.toString() || '');
-                const rowData = jsonData.slice(1).map(row =>
-                    (row as any[]).map(cell => cell?.toString() || '')
-                );
+                let headers: string[] = [];
+                let rowData: string[][] = [];
 
-                resolve({ headers, data: rowData });
+                if (hasHeaders) {
+                    // Extract headers and data
+                    headers = (jsonData[0] as any[]).map(h => h?.toString() || '');
+                    rowData = jsonData.slice(1).map(row =>
+                        (row as any[]).map(cell => cell?.toString() || '')
+                    );
+                } else {
+                    // All rows are data
+                    rowData = jsonData.map(row =>
+                        (row as any[]).map(cell => cell?.toString() || '')
+                    );
+
+                    // Generate default column headers based on first row
+                    if (rowData.length > 0) {
+                        const columnCount = rowData[0].length;
+                        headers = Array.from({ length: columnCount }, (_, i) => `Column ${i + 1}`);
+                    }
+                }
+
+                resolve({ headers, data: rowData, hasHeaders });
             } catch (error) {
                 reject(error);
             }

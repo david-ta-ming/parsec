@@ -1,8 +1,17 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Box, Button, Typography, styled } from '@mui/material';
+import {
+    Box,
+    Button,
+    Typography,
+    styled,
+    FormControlLabel,
+    Switch,
+    Tooltip
+} from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
 const VisuallyHiddenInput = styled('input')({
     clip: 'rect(0 0 0 0)',
@@ -29,12 +38,13 @@ const UploadBox = styled(Box)(({ theme }) => ({
 }));
 
 interface FileUploadProps {
-    onFileUpload: (file: File) => void;
+    onFileUpload: (file: File, hasHeaders: boolean) => void;
 }
 
 export default function FileUpload({ onFileUpload }: FileUploadProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [hasHeaders, setHasHeaders] = useState(true);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleDragEnter = (e: React.DragEvent) => {
@@ -74,7 +84,7 @@ export default function FileUpload({ onFileUpload }: FileUploadProps) {
 
     const handleFile = (file: File) => {
         setSelectedFile(file);
-        onFileUpload(file);
+        onFileUpload(file, hasHeaders);
     };
 
     const handleUploadClick = () => {
@@ -83,35 +93,64 @@ export default function FileUpload({ onFileUpload }: FileUploadProps) {
         }
     };
 
+    const handleHeaderToggleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newHasHeaders = e.target.checked;
+        setHasHeaders(newHasHeaders);
+
+        // If a file is already selected, reprocess it with the new header setting
+        if (selectedFile) {
+            onFileUpload(selectedFile, newHasHeaders);
+        }
+    };
+
     const acceptedFileTypes = '.csv,.tsv,.txt,.xlsx,.xls';
 
     return (
-        <UploadBox
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-            onClick={handleUploadClick}
-            sx={{
-                backgroundColor: isDragging ? 'action.hover' : 'transparent',
-            }}
-        >
-            <CloudUploadIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
-            <Typography variant="h6" component="div" gutterBottom>
-                {selectedFile
-                    ? `Selected: ${selectedFile.name}`
-                    : 'Drag & drop a file here or click to select'
-                }
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-                Supports CSV, TSV, TXT, and Excel files
-            </Typography>
-            <VisuallyHiddenInput
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                accept={acceptedFileTypes}
-            />
-        </UploadBox>
+        <Box>
+            <UploadBox
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                onClick={handleUploadClick}
+                sx={{
+                    backgroundColor: isDragging ? 'action.hover' : 'transparent',
+                    mb: 2
+                }}
+            >
+                <CloudUploadIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
+                <Typography variant="h6" component="div" gutterBottom>
+                    {selectedFile
+                        ? `Selected: ${selectedFile.name}`
+                        : 'Drag & drop a file here or click to select'
+                    }
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                    Supports CSV, TSV, TXT, and Excel files
+                </Typography>
+                <VisuallyHiddenInput
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileSelect}
+                    accept={acceptedFileTypes}
+                />
+            </UploadBox>
+
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={hasHeaders}
+                            onChange={handleHeaderToggleChange}
+                            color="primary"
+                        />
+                    }
+                    label="File has headers"
+                />
+                <Tooltip title="Turn off if your file does not have column headers in the first row" arrow>
+                    <HelpOutlineIcon color="action" fontSize="small" sx={{ ml: 1 }} />
+                </Tooltip>
+            </Box>
+        </Box>
     );
 }

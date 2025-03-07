@@ -31,14 +31,14 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleFileUpload = async (file: File) => {
+  const handleFileUpload = async (file: File, hasHeaders: boolean) => {
     try {
       setIsLoading(true);
       setError(null);
       setFileName(file.name);
       setFileType(file.type);
 
-      const data = await parseFile(file);
+      const data = await parseFile(file, { hasHeaders });
       setFileData(data);
       // Reset transformed data when a new file is uploaded
       setTransformedData([]);
@@ -71,6 +71,7 @@ export default function Home() {
           data: sample,
           headers: fileData.headers,
           transformationPrompt,
+          hasHeaders: fileData.hasHeaders
         }),
       });
 
@@ -113,6 +114,7 @@ export default function Home() {
             data: batch,
             headers: fileData.headers,
             transformationPrompt,
+            hasHeaders: fileData.hasHeaders
           }),
         });
 
@@ -141,11 +143,16 @@ export default function Home() {
 
     switch (format) {
       case 'csv':
-        content = transformedData.map(row => row.join(',')).join('\n');
+        // Include headers row if the original file had headers
+        const csvContent = fileData.headers.join(',') + '\n' +
+            transformedData.map(row => row.join(',')).join('\n');
+        content = csvContent;
         mimeType = 'text/csv';
         break;
       case 'tsv':
-        content = transformedData.map(row => row.join('\t')).join('\n');
+        const tsvContent = fileData.headers.join('\t') + '\n' +
+            transformedData.map(row => row.join('\t')).join('\n');
+        content = tsvContent;
         mimeType = 'text/tab-separated-values';
         break;
       case 'json':
@@ -244,7 +251,7 @@ export default function Home() {
                     File: {fileName}
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 2 }}>
-                    {fileData.data.length} rows of data
+                    {fileData.data.length} rows of data {!fileData.hasHeaders && '(no headers detected)'}
                   </Typography>
 
                   <TextField

@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
 
     try {
 
-        const { data, headers, transformationPrompt } = await req.json();
+        const { data, headers, transformationPrompt, hasHeaders = true } = await req.json();
 
         if (!data || !Array.isArray(data) || data.length === 0) {
             return NextResponse.json(
@@ -37,10 +37,16 @@ For date calculations, use standard algorithms and be perfectly consistent in yo
         const headerStr = headers.join(',');
         const exampleDataStr = data.slice(0, 5).map(row => row.join(',')).join('\n');
 
-        const userPrompt = `Here is the data structure:
-Headers: ${headerStr}
+        // Modify the prompt to include information about whether the file has headers
+        let userPrompt = `Here is the data structure:
+Headers: ${headerStr}`;
 
-Here are some example rows:
+        // If file has no original headers, inform the model these are generated headers
+        if (!hasHeaders) {
+            userPrompt += `\n(Note: These headers were auto-generated because the original file had no headers.)`;
+        }
+
+        userPrompt += `\n\nHere are some example rows:
 ${exampleDataStr}
 
 Instructions: ${transformationPrompt}

@@ -12,7 +12,8 @@ import {
     Paper,
     Typography,
     Tabs,
-    Tab
+    Tab,
+    Chip
 } from '@mui/material';
 import { FileData } from '@/utils/fileParser';
 
@@ -33,6 +34,21 @@ export default function TransformationPreview({ originalData, transformedData }:
     const originalDisplayData = originalData.data.slice(0, displayRowCount);
     const transformedDisplayData = transformedData.slice(0, displayRowCount);
 
+    const HeaderCell = ({ header, isGenerated }: { header: string, isGenerated: boolean }) => (
+        <TableCell>
+            {header}
+            {isGenerated && (
+                <Chip
+                    label="Auto"
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                    sx={{ ml: 1, height: 20, fontSize: '0.6rem' }}
+                />
+            )}
+        </TableCell>
+    );
+
     return (
         <Box sx={{ mb: 4 }}>
             <Typography variant="h6" gutterBottom>
@@ -52,9 +68,11 @@ export default function TransformationPreview({ originalData, transformedData }:
                             <TableRow>
                                 <TableCell>#</TableCell>
                                 {transformedDisplayData[0]?.map((_, index) => (
-                                    <TableCell key={index}>
-                                        {originalData.headers[index] || `Column ${index + 1}`}
-                                    </TableCell>
+                                    <HeaderCell
+                                        key={index}
+                                        header={originalData.headers[index] || `Column ${index + 1}`}
+                                        isGenerated={!originalData.hasHeaders}
+                                    />
                                 ))}
                             </TableRow>
                         </TableHead>
@@ -79,7 +97,11 @@ export default function TransformationPreview({ originalData, transformedData }:
                             <TableRow>
                                 <TableCell>#</TableCell>
                                 {originalData.headers.map((header, index) => (
-                                    <TableCell key={index}>{header}</TableCell>
+                                    <HeaderCell
+                                        key={index}
+                                        header={header}
+                                        isGenerated={!originalData.hasHeaders}
+                                    />
                                 ))}
                             </TableRow>
                         </TableHead>
@@ -105,7 +127,11 @@ export default function TransformationPreview({ originalData, transformedData }:
                                 <TableRow>
                                     <TableCell>#</TableCell>
                                     {originalData.headers.map((header, index) => (
-                                        <TableCell key={index}>{header}</TableCell>
+                                        <HeaderCell
+                                            key={index}
+                                            header={header}
+                                            isGenerated={!originalData.hasHeaders}
+                                        />
                                     ))}
                                 </TableRow>
                             </TableHead>
@@ -128,9 +154,11 @@ export default function TransformationPreview({ originalData, transformedData }:
                                 <TableRow>
                                     <TableCell>#</TableCell>
                                     {transformedDisplayData[0]?.map((_, index) => (
-                                        <TableCell key={index}>
-                                            {originalData.headers[index] || `Column ${index + 1}`}
-                                        </TableCell>
+                                        <HeaderCell
+                                            key={index}
+                                            header={originalData.headers[index] || `Column ${index + 1}`}
+                                            isGenerated={!originalData.hasHeaders}
+                                        />
                                     ))}
                                 </TableRow>
                             </TableHead>
@@ -152,6 +180,12 @@ export default function TransformationPreview({ originalData, transformedData }:
             {transformedData.length > displayRowCount && (
                 <Typography variant="body2" sx={{ mt: 2, fontStyle: 'italic' }}>
                     Showing {displayRowCount} of {transformedData.length} rows. Download the file to see all rows.
+                </Typography>
+            )}
+
+            {!originalData.hasHeaders && (
+                <Typography variant="body2" sx={{ mt: 2, fontStyle: 'italic', color: 'text.secondary' }}>
+                    Note: Column headers were automatically generated since the original file did not have headers.
                 </Typography>
             )}
         </Box>
