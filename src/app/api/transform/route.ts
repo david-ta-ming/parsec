@@ -1,3 +1,5 @@
+// Updated POST function for src/app/api/transform/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import logger from '@/utils/logger';
@@ -8,9 +10,7 @@ const openai = new OpenAI({
 });
 
 export async function POST(req: NextRequest) {
-
     try {
-
         const { data, headers, transformationPrompt, hasHeaders = true } = await req.json();
 
         if (!data || !Array.isArray(data) || data.length === 0) {
@@ -27,11 +27,15 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Build the prompt for OpenAI
+        // Build the prompt for OpenAI with explicit instructions about CSV formatting
         const systemPrompt = `You are a data transformation assistant. Your task is to transform each row of data according to these instructions: "${transformationPrompt}".
-Provide ONLY the transformed data values. Do not include explanations or descriptions.
-Maintain the same number of columns for each row.
-For date calculations, use standard algorithms and be perfectly consistent in your transformations.`;
+Follow these strict rules:
+1. Provide ONLY the transformed data values without any explanations.
+2. Maintain the same number of columns for each row.
+3. For data containing commas (like "First, Last" name format), enclose the ENTIRE value in double quotes like "First, Last".
+4. For any value containing double quotes, escape them by doubling them and enclose the entire value in quotes.
+5. Format your response as one complete row per line, with values separated by commas.
+6. DO NOT add any heading, footer, or explanatory text.`;
 
         // Convert the data to a string format that's easier for the model to understand
         const headerStr = headers.join(',');
@@ -51,7 +55,9 @@ ${exampleDataStr}
 
 Instructions: ${transformationPrompt}
 
-Transform ALL rows according to the instructions. Return ONLY the transformed data in the exact same format (comma-separated values, one row per line). Preserve all columns.`;
+IMPORTANT: If your transformation results in values containing commas (such as "Smith, John"), you MUST enclose the ENTIRE value in double quotes like "Smith, John". This is crucial for proper CSV formatting.
+
+Transform ALL rows according to the instructions. Return ONLY the transformed data as comma-separated values, one row per line. Preserve all columns.`;
 
         // Process data in batches to avoid token limits
         const batchSize = 10;
@@ -78,13 +84,9 @@ Transform ALL rows according to the instructions. Return ONLY the transformed da
 
             const transformedText = response.choices[0].message.content?.trim() || '';
 
-            // Parse the transformed data
-            const transformedRows = transformedText
-                .split('\n')
-                .filter(line => line.trim() !== '')
-                .map(line => line.split(',').map(item => item.trim()));
-
-            transformedData.push(...transformedRows);
+            // Custom CSV parsing that respects quoted values
+            const rows = parseCSV(transformedText);
+            transformedData.push(...rows);
         }
 
         return NextResponse.json({ transformedData });
@@ -96,4 +98,45 @@ Transform ALL rows according to the instructions. Return ONLY the transformed da
             { status: 500 }
         );
     }
+}
+
+// Custom CSV parser
+function parseCSV(csvText: string): string[][] {
+    const rows: string[][] = [];
+    const lines = csvText.split('\n').filter(line => line.trim());
+
+    for (const line of lines) {
+        const row: string[] = [];
+        let inQuotes = false;
+        let currentValue = '';
+
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            const nextChar = i < line.length - 1 ? line[i + 1] : null;
+
+            if (char === '"') {
+                if (inQuotes && nextChar === '"') {
+                    // Escaped quote inside quotes
+                    currentValue += '"';
+                    i++; // Skip the next quote
+                } else {
+                    // Toggle quote state
+                    inQuotes = !inQuotes;
+                }
+            } else if (char === ',' && !inQuotes) {
+                // End of value
+                row.push(currentValue);
+                currentValue = '';
+            } else {
+                // Normal character
+                currentValue += char;
+            }
+        }
+
+        // Add the last value
+        row.push(currentValue);
+        rows.push(row);
+    }
+
+    return rows;
 }

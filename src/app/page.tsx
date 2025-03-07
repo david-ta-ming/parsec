@@ -181,7 +181,7 @@ export default function Home() {
             setIsTransformingFullData(false);
         }
     };
-
+    
     const handleDownload = async (format: 'csv' | 'tsv' | 'json' | 'excel' = 'csv') => {
         if (!fileData) return;
 
@@ -197,29 +197,69 @@ export default function Home() {
 
             switch (format) {
                 case 'csv':
-                    // Only include headers row if the original file had headers
-                    const csvContent = fileData.hasHeaders
-                        ? fileData.headers.join(',') + '\n' + dataToDownload.map(row => row.join(',')).join('\n')
-                        : dataToDownload.map(row => row.join(',')).join('\n');
+                    // For CSV files, we need to handle quoted values properly
+                    let csvContent = '';
+
+                    // Add headers if the original file had them
+                    if (fileData.hasHeaders) {
+                        const headerLine = fileData.headers.map(header => {
+                            // Check if header contains characters that need quoting
+                            if (header.includes(',') || header.includes('"') || header.includes('\n')) {
+                                return `"${header.replace(/"/g, '""')}"`;
+                            }
+                            return header;
+                        }).join(',');
+                        csvContent += headerLine + '\n';
+                    }
+
+                    // Add the data rows
+                    csvContent += dataToDownload.map(row => {
+                        return row.map(value => {
+                            // Quote values containing commas, quotes, or newlines
+                            if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+                                return `"${value.replace(/"/g, '""')}"`;
+                            }
+                            return value;
+                        }).join(',');
+                    }).join('\n');
+
                     content = csvContent;
                     mimeType = 'text/csv';
                     break;
+
                 case 'tsv':
-                    const tsvContent = fileData.hasHeaders
-                        ? fileData.headers.join('\t') + '\n' + dataToDownload.map(row => row.join('\t')).join('\n')
-                        : dataToDownload.map(row => row.join('\t')).join('\n');
+                    // For TSV, replace tabs in values with spaces to avoid delimiter confusion
+                    let tsvContent = '';
+
+                    // Add headers if the original file had them
+                    if (fileData.hasHeaders) {
+                        const headerLine = fileData.headers.map(header =>
+                            header.replace(/\t/g, ' ')
+                        ).join('\t');
+                        tsvContent += headerLine + '\n';
+                    }
+
+                    // Add the data rows
+                    tsvContent += dataToDownload.map(row => {
+                        return row.map(value => value.replace(/\t/g, ' ')).join('\t');
+                    }).join('\n');
+
                     content = tsvContent;
                     mimeType = 'text/tab-separated-values';
                     break;
+
                 case 'json':
                     // Create JSON with headers as keys if original file had headers
-                    // Otherwise create an array of arrays
                     let jsonData;
                     if (fileData.hasHeaders) {
                         jsonData = dataToDownload.map(row => {
                             const rowObj: Record<string, string> = {};
                             fileData.headers.forEach((header, index) => {
-                                rowObj[header] = row[index] || '';
+                                if (index < row.length) {
+                                    rowObj[header] = row[index];
+                                } else {
+                                    rowObj[header] = '';
+                                }
                             });
                             return rowObj;
                         });
@@ -229,6 +269,7 @@ export default function Home() {
                     content = JSON.stringify(jsonData, null, 2);
                     mimeType = 'application/json';
                     break;
+
                 case 'excel':
                     // Create Excel file using the xlsx library
                     import('xlsx').then(XLSX => {
@@ -268,7 +309,9 @@ export default function Home() {
                         setIsLoading(false);
                     });
                     return; // Early return since Excel handling is async
+
                 default:
+                    // Fallback to CSV
                     content = dataToDownload.map(row => row.join(',')).join('\n');
                     mimeType = 'text/csv';
                     outputExtension = 'csv';
