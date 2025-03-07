@@ -11,6 +11,12 @@ frontend:
             echo "✅ OPENAI_API_KEY is set"
           fi
         - |
+          if [ -z "$OPENAI_MODEL" ]; then
+            echo "WARNING: OPENAI_MODEL environment variable is not set, using default (gpt-4o-mini)"
+          else
+            echo "✅ OPENAI_MODEL is set to $OPENAI_MODEL"
+          fi
+        - |
           if [ -z "$LOG_LEVEL" ]; then
             echo "WARNING: LOG_LEVEL environment variable is not set, using default"
           else
@@ -19,7 +25,7 @@ frontend:
         - yarn install
     build:
       commands:
-        - env | grep -e OPENAI_API_KEY -e LOG_LEVEL >> .env.production
+        - env | grep -e OPENAI_API_KEY -e OPENAI_MODEL -e LOG_LEVEL >> .env.production
         - yarn run build
   artifacts:
     baseDirectory: .next
