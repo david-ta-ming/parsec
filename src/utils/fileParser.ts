@@ -35,8 +35,6 @@ export const parseFile = async (file: File, options?: ParseOptions): Promise<Fil
     }
 };
 
-// Fix for src/utils/fileParser.ts - Update the parseCsv function
-
 const parseCsv = async (file: File, delimiter: string, hasHeaders: boolean): Promise<FileData> => {
     const text = await file.text();
     const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');

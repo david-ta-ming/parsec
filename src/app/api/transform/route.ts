@@ -88,8 +88,6 @@ Transform ALL rows according to the instructions. Return the transformed data as
             const response = await openai.chat.completions.create(requestPayload);
             logger.debug('Received OpenAI response', response.choices[0]);
 
-
-
             // Extract the function arguments which contain our JSON data
             try {
                 const content = response.choices[0].message.content?.trim() || '{}';
@@ -102,7 +100,13 @@ Transform ALL rows according to the instructions. Return the transformed data as
         }
 
         // If the requested output is CSV or similar formats, convert the JSON objects to arrays
-        if (outputFormat !== 'json') {
+        if (outputFormat === 'json') {
+            // Return JSON format directly
+            return NextResponse.json({
+                transformedData: transformedResults,
+                headers: Object.keys(transformedResults[0] || {})
+            });
+        } else {
             // Extract all unique keys to ensure consistent columns
             const allKeys = new Set<string>();
             transformedResults.forEach(row => {
@@ -118,14 +122,8 @@ Transform ALL rows according to the instructions. Return the transformed data as
             return NextResponse.json({transformedData, headers: orderedKeys});
         }
 
-        // Return JSON format directly
-        return NextResponse.json({
-            transformedData: transformedResults,
-            headers: Object.keys(transformedResults[0] || {})
-        });
-
     } catch (error) {
-        console.error('Error transforming data:', error);
+        logger.error('Error transforming data:', error);
 
         return NextResponse.json(
             {error: `Error transforming data: ${error instanceof Error ? error.message : 'Unknown error'}`},
