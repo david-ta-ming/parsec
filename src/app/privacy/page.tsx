@@ -1,5 +1,3 @@
-'use client';
-
 import { Box, Container, Typography, Paper, Button } from '@mui/material';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -32,11 +30,11 @@ export default function PrivacyPolicy() {
                         Introduction
                     </Typography>
                     <Typography variant="body1" paragraph>
-                        Welcome to Parsec ("we," "our," or "us"). We are committed to protecting your privacy and ensuring the security of your data. This Privacy Policy explains how we handle data when you use our data transformation services.
+                        Welcome to Parsec (&#34;we,&#34; &#34;our,&#34; or &#34;us&#34;). We are committed to protecting your privacy and ensuring the security of your data. This Privacy Policy explains how we handle data when you use our data transformation services.
                     </Typography>
 
                     <Typography variant="h5" component="h2" sx={{ mt: 4, mb: 2 }}>
-                        Information We Don't Collect
+                        Information We Don&#39;t Collect
                     </Typography>
                     <Typography variant="body1" paragraph>
                         Parsec is designed with privacy as a core principle. We <strong>do not</strong>:
@@ -61,7 +59,7 @@ export default function PrivacyPolicy() {
                             <strong>File Processing</strong>: When you upload a file, it is processed entirely in your browser or temporarily during API processing.
                         </Typography>
                         <Typography component="li" variant="body1">
-                            <strong>Transformation</strong>: Your data is sent securely to our API service, which utilizes OpenAI's API to perform the requested transformations.
+                            <strong>Transformation</strong>: Your data is sent securely to our API service, which utilizes OpenAI&#39;s API to perform the requested transformations.
                         </Typography>
                         <Typography component="li" variant="body1">
                             <strong>Results</strong>: The transformed data is returned to your browser and is not stored on our servers once the operation is complete.

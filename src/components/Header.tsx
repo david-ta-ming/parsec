@@ -1,5 +1,3 @@
-'use client';
-
 import { AppBar, Toolbar, Typography, Box, Button, Container } from '@mui/material';
 import ParsecLogo from './ParsecLogo';
 import GitHubIcon from '@mui/icons-material/GitHub';
