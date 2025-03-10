@@ -71,8 +71,6 @@ export default function Home() {
     const [tabValue, setTabValue] = useState<number>(0);
     const [isTransformingFullData, setIsTransformingFullData] = useState<boolean>(false);
     const [transformedData, setTransformedData] = useState<Record<string, string>[]>([]);
-    const [, setTransformedJsonData] = useState<Record<string, string>[]>([]);
-    const [outputFormat,] = useState<'csv' | 'tsv' | 'json' | 'excel'>('csv');
 
     const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
@@ -210,6 +208,11 @@ export default function Home() {
             // First transform all data if needed
             const dataToDownload = transformedData.length > 0 ? transformedData : await transformAllData();
 
+            // Get all unique column keys from transformed data
+            const transformedHeaders = dataToDownload.length > 0
+                ? Object.keys(dataToDownload[0])
+                : fileData.headers;
+
             let content: string | Blob;
             let mimeType: string;
             let outputExtension: string = format;
@@ -218,19 +221,18 @@ export default function Home() {
                 case 'csv':
                 case 'tsv':
                     // Convert JSON objects to arrays for CSV/TSV output
-                    const dataArray = convertJsonObjectsToArray(dataToDownload, fileData.headers);
+                    // Use transformedHeaders instead of original headers
+                    const dataArray = convertJsonObjectsToArray(dataToDownload, transformedHeaders);
 
                     // Use Papa Parse to generate CSV/TSV
                     const config: Papa.UnparseConfig = {
                         delimiter: format === 'tsv' ? '\t' : ',',
-                        header: fileData.hasHeaders,
+                        header: true, // Always include headers for better clarity
                         quotes: true,
                     };
 
-                    // Create array with headers as first row if needed
-                    const dataWithHeaders = fileData.hasHeaders
-                        ? [fileData.headers, ...dataArray]
-                        : dataArray;
+                    // Create array with headers as first row
+                    const dataWithHeaders = [transformedHeaders, ...dataArray];
 
                     content = Papa.unparse(dataWithHeaders, config);
                     mimeType = format === 'csv' ? 'text/csv' : 'text/tab-separated-values';
@@ -244,17 +246,16 @@ export default function Home() {
 
                 case 'excel':
                     // Convert JSON objects to arrays for Excel output
-                    const excelDataArray = convertJsonObjectsToArray(dataToDownload, fileData.headers);
+                    // Use transformedHeaders instead of original headers
+                    const excelDataArray = convertJsonObjectsToArray(dataToDownload, transformedHeaders);
 
                     // Create Excel file using the xlsx library
                     import('xlsx').then(XLSX => {
                         // Create a new workbook
                         const wb = XLSX.utils.book_new();
 
-                        // Add data with or without headers
-                        const excelData = fileData.hasHeaders
-                            ? [fileData.headers, ...excelDataArray]
-                            : excelDataArray;
+                        // Add data with headers
+                        const excelData = [transformedHeaders, ...excelDataArray];
 
                         // Create a worksheet from the data
                         const ws = XLSX.utils.aoa_to_sheet(excelData);
@@ -276,7 +277,7 @@ export default function Home() {
 
                 default:
                     // Fallback to CSV
-                    const fallbackArray = convertJsonObjectsToArray(dataToDownload, fileData.headers);
+                    const fallbackArray = convertJsonObjectsToArray(dataToDownload, transformedHeaders);
                     content = Papa.unparse(fallbackArray);
                     mimeType = 'text/csv';
                     outputExtension = 'csv';
