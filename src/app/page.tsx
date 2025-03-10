@@ -403,7 +403,7 @@ export default function Home() {
                                 </Alert>
                             )}
 
-                            <Box sx={{display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap'}}>
+                            <Box sx={{display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', justifyContent: 'space-between'}}>
                                 {fileData && (
                                     <Button
                                         variant="contained"
@@ -415,7 +415,7 @@ export default function Home() {
                                 )}
 
                                 {transformedData.length > 0 && (
-                                    <Box sx={{display: 'flex', gap: 1}}>
+                                    <Box sx={{display: 'flex', gap: 1, ml: 'auto'}}>
                                         <Typography variant="body2" sx={{mr: 1, alignSelf: 'center'}}>
                                             Download as:
                                         </Typography>
