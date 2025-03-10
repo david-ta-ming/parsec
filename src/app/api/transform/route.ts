@@ -41,27 +41,40 @@ export async function POST(req: NextRequest) {
         const systemPrompt = `You are a data transformation assistant. Your task is to transform each row of data according to these instructions: "${transformationPrompt}".
 Follow these strict rules:
 1. Transform the data as per the user's instructions.
-2. Return the transformed data in the specified JSON format with column headers as keys.
-3. Maintain the same number of columns for each row unless explicitly instructed to add or remove columns.
-4. DO NOT add any explanations or comments in your response.`;
+2. The input data will be provided as JSON objects where each object represents a row with column headers as keys.
+3. Return the transformed data in the same JSON format with column headers as keys.
+4. Maintain the same number of columns for each row unless explicitly instructed to add or remove columns.
+5. DO NOT add any explanations or comments in your response.
+6. Your response must be a valid JSON object with a 'data' field containing an array of transformed row objects.`;
 
-        // Convert the data to a string format that's easier for the model to understand
-        const headerStr = headers.join(',');
-        const exampleDataStr = data.slice(0, 5).map(row => row.join(',')).join('\n');
+        // Convert data to structured JSON for safer handling
+        const exampleRows = data.slice(0, 5).map(row => {
+            const rowObj: Record<string, string> = {};
+            headers.forEach((header: string | number, index: number) => {
+                if (index < row.length) {
+                    rowObj[header] = row[index];
+                }
+            });
+            return rowObj;
+        });
 
-        // Modify the prompt to include information about whether the file has headers
-        let userPrompt = `Here is the data structure:
-Headers: ${headerStr}`;
+        // Create a JSON representation of the headers and example data
+        const dataStructure = {
+            headers: headers,
+            exampleRows: exampleRows,
+            hasOriginalHeaders: hasHeaders
+        };
+
+        // Modify the prompt to include structured data
+        let userPrompt = `Here is the data structure in JSON format:
+${JSON.stringify(dataStructure, null, 2)}`;
 
         // If file has no original headers, inform the model these are generated headers
         if (!hasHeaders) {
-            userPrompt += `\n(Note: These headers were auto-generated because the original file had no headers.)`;
+            userPrompt += `\n(Note: The headers were auto-generated because the original file had no headers.)`;
         }
 
-        userPrompt += `\n\nHere are some example rows:
-${exampleDataStr}
-
-Instructions: ${transformationPrompt}
+        userPrompt += `\n\nInstructions: ${transformationPrompt}
 
 Transform ALL rows according to the instructions. Return the transformed data as a JSON object where each row is represented as an object with column headers as keys.`;
 
@@ -71,14 +84,24 @@ Transform ALL rows according to the instructions. Return the transformed data as
 
         for (let i = 0; i < data.length; i += batchSize) {
             const batch = data.slice(i, Math.min(i + batchSize, data.length));
-            const batchDataStr = batch.map(row => row.join(',')).join('\n');
+
+            // Convert batch data to JSON objects for safer handling
+            const batchDataJSON = batch.map(row => {
+                const rowObj: Record<string, string> = {};
+                headers.forEach((header: string | number, index: number) => {
+                    if (index < row.length) {
+                        rowObj[header] = row[index];
+                    }
+                });
+                return rowObj;
+            });
 
             const requestPayload: OpenAI.Chat.ChatCompletionCreateParams = {
                 model: MODEL,
                 messages: [
                     {role: 'system', content: systemPrompt},
                     {role: 'user', content: userPrompt},
-                    {role: 'user', content: `Transform these rows:\n${batchDataStr}`}
+                    {role: 'user', content: `Transform these rows:\n${JSON.stringify(batchDataJSON, null, 2)}`}
                 ],
                 temperature: 0, // Use zero temperature for deterministic results
                 response_format: {type: "json_object"}
@@ -99,7 +122,7 @@ Transform ALL rows according to the instructions. Return the transformed data as
             }
         }
 
-        // If the requested output is CSV or similar formats, convert the JSON objects to arrays
+        // If the requested output is JSON, return the JSON objects directly
         if (outputFormat === 'json') {
             // Return JSON format directly
             return NextResponse.json({

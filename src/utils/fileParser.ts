@@ -1,13 +1,14 @@
 import * as XLSX from 'xlsx';
+import Papa from 'papaparse';
 
 export interface FileData {
     headers: string[];
     data: string[][];
-    hasHeaders: boolean; // New flag to indicate if the file had original headers
+    hasHeaders: boolean;
 }
 
 export interface ParseOptions {
-    hasHeaders?: boolean; // Optional parameter to specify if file has headers
+    hasHeaders?: boolean;
 }
 
 export const parseFile = async (file: File, options?: ParseOptions): Promise<FileData> => {
@@ -22,11 +23,9 @@ export const parseFile = async (file: File, options?: ParseOptions): Promise<Fil
 
     switch (fileExtension) {
         case 'csv':
-            return parseCsv(file, ',', hasHeaders);
         case 'tsv':
-            return parseCsv(file, '\t', hasHeaders);
         case 'txt':
-            return parseTxt(file, hasHeaders);
+            return parseTextFile(file, hasHeaders, fileExtension);
         case 'xlsx':
         case 'xls':
             return parseExcel(file, hasHeaders);
@@ -35,116 +34,49 @@ export const parseFile = async (file: File, options?: ParseOptions): Promise<Fil
     }
 };
 
-const parseCsv = async (file: File, delimiter: string, hasHeaders: boolean): Promise<FileData> => {
+const parseTextFile = async (file: File, hasHeaders: boolean, fileType: string): Promise<FileData> => {
     const text = await file.text();
-    const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
 
-    // Improved CSV parser that properly handles quoted values
-    const parseCSVLine = (line: string): string[] => {
-        const result: string[] = [];
-        let inQuotes = false;
-        let currentValue = '';
-
-        for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            const nextChar = line[i + 1];
-
-            if (char === '"') {
-                // Handle escaped quotes (two double quotes in a row)
-                if (nextChar === '"') {
-                    currentValue += '"';
-                    i++; // Skip the next quote
-                } else {
-                    // Toggle quote state
-                    inQuotes = !inQuotes;
-                }
-            } else if (char === delimiter && !inQuotes) {
-                // We found a delimiter not inside quotes
-                result.push(currentValue);
-                currentValue = '';
-            } else {
-                // Regular character
-                currentValue += char;
-            }
-        }
-
-        // Add the last value
-        result.push(currentValue);
-
-        return result;
+    // Configure Papa Parse based on file type
+    const config: Papa.ParseConfig = {
+        header: false, // We'll handle headers separately
+        skipEmptyLines: true,
+        // For TSV files, set the delimiter to tab
+        delimiter: fileType === 'tsv' ? '\t' : undefined, // Auto-detect for CSV and TXT
     };
 
-    if (lines.length === 0) {
+    const results = Papa.parse(text, config);
+
+    if (results.errors.length > 0) {
+        console.warn('Parse warnings:', results.errors);
+    }
+
+    if (!results.data || results.data.length === 0) {
         return { headers: [], data: [], hasHeaders };
     }
 
+    // Convert all values to strings
+    const stringData = results.data.map(row =>
+        (row as unknown[]).map(cell => cell?.toString() || '')
+    );
+
     let headers: string[] = [];
-    let rowData: string[][] = [];
+    let data: string[][];
 
-    if (hasHeaders) {
-        // If file has headers, use the first line as headers
-        headers = parseCSVLine(lines[0]);
-        rowData = lines.slice(1).map(line => parseCSVLine(line));
+    if (hasHeaders && stringData.length > 0) {
+        // Use first row as headers
+        headers = stringData[0];
+        data = stringData.slice(1);
     } else {
-        // If file has no headers, generate headers and use all lines as data
-        rowData = lines.map(line => parseCSVLine(line));
-
-        // Generate default column headers based on first row
-        if (rowData.length > 0) {
-            const columnCount = rowData[0].length;
+        data = stringData;
+        // Generate default column headers
+        if (data.length > 0) {
+            const columnCount = data[0].length;
             headers = Array.from({ length: columnCount }, (_, i) => `Column ${i + 1}`);
         }
     }
 
-    return { headers, data: rowData, hasHeaders };
-};
-
-const parseTxt = async (file: File, hasHeaders: boolean): Promise<FileData> => {
-    const text = await file.text();
-    const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-
-    // Try to detect the delimiter
-    let delimiter = '\t'; // Default to tab
-    if (lines.length > 0) {
-        const firstLine = lines[0];
-        // Check common delimiters
-        const delimiters = ['\t', ',', ';', '|'];
-        const counts = delimiters.map(d => {
-            return {
-                delimiter: d,
-                count: (firstLine.match(new RegExp(d, 'g')) || []).length
-            };
-        });
-
-        const bestMatch = counts.reduce((prev, current) =>
-            current.count > prev.count ? current : prev, { delimiter: '\t', count: 0 });
-
-        if (bestMatch.count > 0) {
-            delimiter = bestMatch.delimiter;
-        }
-    }
-
-    if (lines.length === 0) {
-        return { headers: [], data: [], hasHeaders };
-    }
-
-    let headers: string[] = [];
-    let rowData: string[][] = [];
-
-    if (hasHeaders) {
-        headers = lines[0].split(delimiter);
-        rowData = lines.slice(1).map(line => line.split(delimiter));
-    } else {
-        rowData = lines.map(line => line.split(delimiter));
-
-        // Generate default column headers based on first row
-        if (rowData.length > 0) {
-            const columnCount = rowData[0].length;
-            headers = Array.from({ length: columnCount }, (_, i) => `Column ${i + 1}`);
-        }
-    }
-
-    return { headers, data: rowData, hasHeaders };
+    return { headers, data, hasHeaders };
 };
 
 const parseExcel = async (file: File, hasHeaders: boolean): Promise<FileData> => {
@@ -169,7 +101,7 @@ const parseExcel = async (file: File, hasHeaders: boolean): Promise<FileData> =>
                 }
 
                 let headers: string[] = [];
-                let rowData: string[][] = [];
+                let rowData: string[][];
 
                 if (hasHeaders) {
                     // Extract headers and data
@@ -204,8 +136,6 @@ const parseExcel = async (file: File, hasHeaders: boolean): Promise<FileData> =>
     });
 };
 
-// Add these functions to src/utils/fileParser.ts or create a new file
-
 /**
  * Converts array data to structured JSON objects with column headers as keys
  */
@@ -233,21 +163,4 @@ export const convertJsonObjectsToArray = (
     return jsonObjects.map(obj => {
         return headers.map(header => obj[header] || '');
     });
-};
-
-/**
- * Updates the headers based on the keys in the JSON objects
- */
-export const extractHeadersFromJsonObjects = (
-    jsonObjects: Record<string, string>[]
-): string[] => {
-    if (jsonObjects.length === 0) return [];
-
-    // Get all unique keys from all objects
-    const allKeys = new Set<string>();
-    jsonObjects.forEach(obj => {
-        Object.keys(obj).forEach(key => allKeys.add(key));
-    });
-
-    return Array.from(allKeys);
 };

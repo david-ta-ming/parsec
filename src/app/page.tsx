@@ -30,9 +30,9 @@ import Footer from '@/components/Footer';
 import {parseFile, FileData} from '@/utils/fileParser';
 import {
     convertArrayToJsonObjects,
-    convertJsonObjectsToArray,
-    extractHeadersFromJsonObjects
+    convertJsonObjectsToArray
 } from '@/utils/fileParser';
+import Papa from "papaparse";
 
 // Interface for the tabs
 interface TabPanelProps {
@@ -71,8 +71,8 @@ export default function Home() {
     const [tabValue, setTabValue] = useState<number>(0);
     const [isTransformingFullData, setIsTransformingFullData] = useState<boolean>(false);
     const [transformedData, setTransformedData] = useState<string[][]>([]);
-    const [transformedJsonData, setTransformedJsonData] = useState<Record<string, string>[]>([]);
-    const [outputFormat, setOutputFormat] = useState<'csv' | 'tsv' | 'json' | 'excel'>('csv');
+    const [, setTransformedJsonData] = useState<Record<string, string>[]>([]);
+    const [outputFormat,] = useState<'csv' | 'tsv' | 'json' | 'excel'>('csv');
 
     const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
@@ -158,7 +158,7 @@ export default function Home() {
         }
     };
 
-// Update the transformAllData function similarly
+    // Update the transformAllData function similarly
     const transformAllData = async (): Promise<string[][]> => {
         if (!fileData || !transformationPrompt.trim()) {
             setError('Please upload a file and provide transformation instructions');
@@ -238,7 +238,7 @@ export default function Home() {
             setIsLoading(true);
 
             // First transform all data if needed
-            const dataToDownload = await transformAllData();
+            const dataToDownload = transformedData.length > 0 ? transformedData : await transformAllData();
 
             let content: string | Blob;
             let mimeType: string;
@@ -246,75 +246,29 @@ export default function Home() {
 
             switch (format) {
                 case 'csv':
-                    // For CSV files, we need to handle quoted values properly
-                    let csvContent = '';
-
-                    // Add headers if the original file had them
-                    if (fileData.hasHeaders) {
-                        const headerLine = fileData.headers.map(header => {
-                            // Check if header contains characters that need quoting
-                            if (header.includes(',') || header.includes('"') || header.includes('\n')) {
-                                return `"${header.replace(/"/g, '""')}"`;
-                            }
-                            return header;
-                        }).join(',');
-                        csvContent += headerLine + '\n';
-                    }
-
-                    // Add the data rows
-                    csvContent += dataToDownload.map(row => {
-                        return row.map(value => {
-                            // Quote values containing commas, quotes, or newlines
-                            if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-                                return `"${value.replace(/"/g, '""')}"`;
-                            }
-                            return value;
-                        }).join(',');
-                    }).join('\n');
-
-                    content = csvContent;
-                    mimeType = 'text/csv';
-                    break;
-
                 case 'tsv':
-                    // For TSV, replace tabs in values with spaces to avoid delimiter confusion
-                    let tsvContent = '';
+                    // Use Papa Parse to generate CSV/TSV
+                    const config: Papa.UnparseConfig = {
+                        delimiter: format === 'tsv' ? '\t' : ',',
+                        header: fileData.hasHeaders,
+                        quotes: true,  // Add quotes around fields that need them
+                    };
 
-                    // Add headers if the original file had them
-                    if (fileData.hasHeaders) {
-                        const headerLine = fileData.headers.map(header =>
-                            header.replace(/\t/g, ' ')
-                        ).join('\t');
-                        tsvContent += headerLine + '\n';
-                    }
+                    // Create array with headers as first row if needed
+                    const dataWithHeaders = fileData.hasHeaders
+                        ? [fileData.headers, ...dataToDownload]
+                        : dataToDownload;
 
-                    // Add the data rows
-                    tsvContent += dataToDownload.map(row => {
-                        return row.map(value => value.replace(/\t/g, ' ')).join('\t');
-                    }).join('\n');
-
-                    content = tsvContent;
-                    mimeType = 'text/tab-separated-values';
+                    content = Papa.unparse(dataWithHeaders, config);
+                    mimeType = format === 'csv' ? 'text/csv' : 'text/tab-separated-values';
                     break;
 
                 case 'json':
-                    // Create JSON with headers as keys if original file had headers
-                    let jsonData;
-                    if (fileData.hasHeaders) {
-                        jsonData = dataToDownload.map(row => {
-                            const rowObj: Record<string, string> = {};
-                            fileData.headers.forEach((header, index) => {
-                                if (index < row.length) {
-                                    rowObj[header] = row[index];
-                                } else {
-                                    rowObj[header] = '';
-                                }
-                            });
-                            return rowObj;
-                        });
-                    } else {
-                        jsonData = dataToDownload;
-                    }
+                    // Create JSON objects with headers as keys
+                    const jsonData = fileData.hasHeaders
+                        ? convertArrayToJsonObjects(dataToDownload, fileData.headers)
+                        : dataToDownload;
+
                     content = JSON.stringify(jsonData, null, 2);
                     mimeType = 'application/json';
                     break;
@@ -361,7 +315,7 @@ export default function Home() {
 
                 default:
                     // Fallback to CSV
-                    content = dataToDownload.map(row => row.join(',')).join('\n');
+                    content = Papa.unparse(dataToDownload);
                     mimeType = 'text/csv';
                     outputExtension = 'csv';
             }
