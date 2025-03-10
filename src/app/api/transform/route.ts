@@ -80,7 +80,7 @@ Transform ALL rows according to the instructions. Return ONLY the transformed da
             const batch = data.slice(i, Math.min(i + batchSize, data.length));
             const batchDataStr = batch.map(row => row.join(',')).join('\n');
 
-            const requestPayload = {
+            const requestPayload: OpenAI.Chat.ChatCompletionCreateParams = {
                 model: MODEL,
                 messages: [
                     { role: 'system', content: systemPrompt },
@@ -89,7 +89,7 @@ Transform ALL rows according to the instructions. Return ONLY the transformed da
                 ],
                 temperature: 0, // Use zero temperature for deterministic results
                 max_tokens: 2000,
-            } as OpenAI.ChatCompletionCreateParamsNonStreaming;
+            };
 
             logger.debug('Sending OpenAI request', requestPayload);
 
