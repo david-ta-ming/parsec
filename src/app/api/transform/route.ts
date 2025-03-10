@@ -47,16 +47,27 @@ Follow these strict rules:
 5. DO NOT add any explanations or comments in your response.
 6. Your response must be a valid JSON object with a 'data' field containing an array of transformed row objects.`;
 
-        // Convert data to structured JSON for safer handling
-        const exampleRows = data.slice(0, 5).map(row => {
-            const rowObj: Record<string, string> = {};
-            headers.forEach((header: string | number, index: number) => {
-                if (index < row.length) {
-                    rowObj[header] = row[index];
-                }
+        // Check if the input data is already in JSON object format or needs conversion
+        let dataJson: Record<string, string>[];
+
+        // If the first item is an object, assume the entire data is already in object format
+        if (data.length > 0 && typeof data[0] === 'object' && !Array.isArray(data[0])) {
+            dataJson = data;
+        } else {
+            // Convert array data to structured JSON for safer handling
+            dataJson = data.map(row => {
+                const rowObj: Record<string, string> = {};
+                headers.forEach((header: string | number, index: number) => {
+                    if (index < row.length) {
+                        rowObj[header.toString()] = row[index];
+                    }
+                });
+                return rowObj;
             });
-            return rowObj;
-        });
+        }
+
+        // Create example rows for the prompt
+        const exampleRows = dataJson.slice(0, 5);
 
         // Create a JSON representation of the headers and example data
         const dataStructure = {
@@ -82,26 +93,15 @@ Transform ALL rows according to the instructions. Return the transformed data as
         const batchSize = 30;
         const transformedResults = [];
 
-        for (let i = 0; i < data.length; i += batchSize) {
-            const batch = data.slice(i, Math.min(i + batchSize, data.length));
-
-            // Convert batch data to JSON objects for safer handling
-            const batchDataJSON = batch.map(row => {
-                const rowObj: Record<string, string> = {};
-                headers.forEach((header: string | number, index: number) => {
-                    if (index < row.length) {
-                        rowObj[header] = row[index];
-                    }
-                });
-                return rowObj;
-            });
+        for (let i = 0; i < dataJson.length; i += batchSize) {
+            const batch = dataJson.slice(i, Math.min(i + batchSize, dataJson.length));
 
             const requestPayload: OpenAI.Chat.ChatCompletionCreateParams = {
                 model: MODEL,
                 messages: [
                     {role: 'system', content: systemPrompt},
                     {role: 'user', content: userPrompt},
-                    {role: 'user', content: `Transform these rows:\n${JSON.stringify(batchDataJSON, null, 2)}`}
+                    {role: 'user', content: `Transform these rows:\n${JSON.stringify(batch, null, 2)}`}
                 ],
                 temperature: 0, // Use zero temperature for deterministic results
                 response_format: {type: "json_object"}
@@ -139,7 +139,7 @@ Transform ALL rows according to the instructions. Return the transformed data as
             // Convert objects to arrays based on headers order or all keys if needed
             const orderedKeys = hasHeaders ? headers : Array.from(allKeys);
             const transformedData = transformedResults.map(row => {
-                return orderedKeys.map((key: string | number) => (row[key] || '').toString());
+                return orderedKeys.map((key: string | number) => (row[key.toString()] || '').toString());
             });
 
             return NextResponse.json({transformedData, headers: orderedKeys});

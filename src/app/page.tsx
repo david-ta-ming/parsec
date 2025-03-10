@@ -70,7 +70,7 @@ export default function Home() {
     const [error, setError] = useState<string | null>(null);
     const [tabValue, setTabValue] = useState<number>(0);
     const [isTransformingFullData, setIsTransformingFullData] = useState<boolean>(false);
-    const [transformedData, setTransformedData] = useState<string[][]>([]);
+    const [transformedData, setTransformedData] = useState<Record<string, string>[]>([]);
     const [, setTransformedJsonData] = useState<Record<string, string>[]>([]);
     const [outputFormat,] = useState<'csv' | 'tsv' | 'json' | 'excel'>('csv');
 
@@ -111,17 +111,20 @@ export default function Home() {
             // Only send a sample of the data for transformation
             const sample = fileData.data.slice(0, Math.min(10, fileData.data.length));
 
+            // Convert sample data to JSON objects before sending to API
+            const sampleObjects = convertArrayToJsonObjects(sample, fileData.headers);
+
             const response = await fetch('/api/transform', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    data: sample,
+                    data: sampleObjects,
                     headers: fileData.headers,
                     transformationPrompt,
                     hasHeaders: fileData.hasHeaders,
-                    outputFormat // Include the desired output format
+                    outputFormat: 'json' // Always request JSON from the API
                 }),
             });
 
@@ -131,23 +134,8 @@ export default function Home() {
 
             const result = await response.json();
 
-            if (outputFormat === 'json') {
-                // Handle JSON format
-                setTransformedJsonData(result.transformedData);
-                // Also convert to array format for display compatibility
-                setTransformedData(convertJsonObjectsToArray(
-                    result.transformedData,
-                    result.headers || fileData.headers
-                ));
-            } else {
-                // Handle CSV/TSV/Excel formats (array-based)
-                setTransformedData(result.transformedData);
-                // Also convert to JSON objects for potential JSON download
-                setTransformedJsonData(convertArrayToJsonObjects(
-                    result.transformedData,
-                    fileData.headers
-                ));
-            }
+            // Store the transformed data in our standard format
+            setTransformedData(result.transformedData);
 
             // Switch to the transformed data tab after transformation
             setTabValue(1);
@@ -159,7 +147,7 @@ export default function Home() {
     };
 
     // Update the transformAllData function similarly
-    const transformAllData = async (): Promise<string[][]> => {
+    const transformAllData = async (): Promise<Record<string, string>[]> => {
         if (!fileData || !transformationPrompt.trim()) {
             setError('Please upload a file and provide transformation instructions');
             throw new Error('Missing file data or transformation prompt');
@@ -171,11 +159,13 @@ export default function Home() {
 
             // Process data in batches to avoid timeout
             const batchSize = 100;
-            let allTransformedRows: string[][] = [];
-            let allTransformedJsonRows: Record<string, string>[] = [];
+            let allTransformedRows: Record<string, string>[] = [];
 
             for (let i = 0; i < fileData.data.length; i += batchSize) {
                 const batch = fileData.data.slice(i, i + batchSize);
+
+                // Convert batch to JSON objects
+                const batchObjects = convertArrayToJsonObjects(batch, fileData.headers);
 
                 const response = await fetch('/api/transform', {
                     method: 'POST',
@@ -183,11 +173,11 @@ export default function Home() {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        data: batch,
+                        data: batchObjects,
                         headers: fileData.headers,
                         transformationPrompt,
                         hasHeaders: fileData.hasHeaders,
-                        outputFormat
+                        outputFormat: 'json' // Always request JSON from the API
                     }),
                 });
 
@@ -196,31 +186,11 @@ export default function Home() {
                 }
 
                 const result = await response.json();
-
-                if (outputFormat === 'json') {
-                    // Handle JSON format
-                    allTransformedJsonRows = [...allTransformedJsonRows, ...result.transformedData];
-                    // Also convert for array compatibility
-                    const arrayData = convertJsonObjectsToArray(
-                        result.transformedData,
-                        result.headers || fileData.headers
-                    );
-                    allTransformedRows = [...allTransformedRows, ...arrayData];
-                } else {
-                    // Handle CSV/TSV/Excel formats (array-based)
-                    allTransformedRows = [...allTransformedRows, ...result.transformedData];
-                    // Also convert to JSON objects
-                    const jsonData = convertArrayToJsonObjects(
-                        result.transformedData,
-                        fileData.headers
-                    );
-                    allTransformedJsonRows = [...allTransformedJsonRows, ...jsonData];
-                }
+                allTransformedRows = [...allTransformedRows, ...result.transformedData];
             }
 
             // Update the state with all transformed data
             setTransformedData(allTransformedRows);
-            setTransformedJsonData(allTransformedJsonRows);
 
             return allTransformedRows;
         } catch (err) {
@@ -247,33 +217,35 @@ export default function Home() {
             switch (format) {
                 case 'csv':
                 case 'tsv':
+                    // Convert JSON objects to arrays for CSV/TSV output
+                    const dataArray = convertJsonObjectsToArray(dataToDownload, fileData.headers);
+
                     // Use Papa Parse to generate CSV/TSV
                     const config: Papa.UnparseConfig = {
                         delimiter: format === 'tsv' ? '\t' : ',',
                         header: fileData.hasHeaders,
-                        quotes: true,  // Add quotes around fields that need them
+                        quotes: true,
                     };
 
                     // Create array with headers as first row if needed
                     const dataWithHeaders = fileData.hasHeaders
-                        ? [fileData.headers, ...dataToDownload]
-                        : dataToDownload;
+                        ? [fileData.headers, ...dataArray]
+                        : dataArray;
 
                     content = Papa.unparse(dataWithHeaders, config);
                     mimeType = format === 'csv' ? 'text/csv' : 'text/tab-separated-values';
                     break;
 
                 case 'json':
-                    // Create JSON objects with headers as keys
-                    const jsonData = fileData.hasHeaders
-                        ? convertArrayToJsonObjects(dataToDownload, fileData.headers)
-                        : dataToDownload;
-
-                    content = JSON.stringify(jsonData, null, 2);
+                    // Use JSON objects directly
+                    content = JSON.stringify(dataToDownload, null, 2);
                     mimeType = 'application/json';
                     break;
 
                 case 'excel':
+                    // Convert JSON objects to arrays for Excel output
+                    const excelDataArray = convertJsonObjectsToArray(dataToDownload, fileData.headers);
+
                     // Create Excel file using the xlsx library
                     import('xlsx').then(XLSX => {
                         // Create a new workbook
@@ -281,8 +253,8 @@ export default function Home() {
 
                         // Add data with or without headers
                         const excelData = fileData.hasHeaders
-                            ? [fileData.headers, ...dataToDownload]
-                            : dataToDownload;
+                            ? [fileData.headers, ...excelDataArray]
+                            : excelDataArray;
 
                         // Create a worksheet from the data
                         const ws = XLSX.utils.aoa_to_sheet(excelData);
@@ -296,26 +268,16 @@ export default function Home() {
                         // Create a Blob from the buffer
                         const blob = new Blob([excelBuffer], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 
-                        // Create a filename with the xlsx extension
-                        const baseName = fileName.split('.')[0] || 'transformed_data';
-                        const excelFilename = `${baseName}_transformed.xlsx`;
-
                         // Trigger download
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = excelFilename;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
+                        downloadFile(blob, `${fileName.split('.')[0] || 'transformed_data'}_transformed.xlsx`);
                         setIsLoading(false);
                     });
                     return; // Early return since Excel handling is async
 
                 default:
                     // Fallback to CSV
-                    content = Papa.unparse(dataToDownload);
+                    const fallbackArray = convertJsonObjectsToArray(dataToDownload, fileData.headers);
+                    content = Papa.unparse(fallbackArray);
                     mimeType = 'text/csv';
                     outputExtension = 'csv';
             }
@@ -326,19 +288,23 @@ export default function Home() {
 
             // For non-Excel formats (which return early)
             const blob = new Blob([content as string], {type: mimeType});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = outputFilename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            downloadFile(blob, outputFilename);
         } catch (err) {
             setError(`Error downloading file: ${err instanceof Error ? err.message : String(err)}`);
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const downloadFile = (blob: Blob, filename: string) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
 
     // Create a data preview component using Material UI components
