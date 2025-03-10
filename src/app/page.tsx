@@ -28,6 +28,11 @@ import TransformationPreview from '@/components/TransformationPreview';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import {parseFile, FileData} from '@/utils/fileParser';
+import {
+    convertArrayToJsonObjects,
+    convertJsonObjectsToArray,
+    extractHeadersFromJsonObjects
+} from '@/utils/fileParser';
 
 // Interface for the tabs
 interface TabPanelProps {
@@ -60,12 +65,14 @@ export default function Home() {
     const [fileData, setFileData] = useState<FileData | null>(null);
     const [fileName, setFileName] = useState<string>('');
     const [, setFileType] = useState<string>('');
-    const [transformedData, setTransformedData] = useState<string[][]>([]);
     const [transformationPrompt, setTransformationPrompt] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [tabValue, setTabValue] = useState<number>(0);
     const [isTransformingFullData, setIsTransformingFullData] = useState<boolean>(false);
+    const [transformedData, setTransformedData] = useState<string[][]>([]);
+    const [transformedJsonData, setTransformedJsonData] = useState<Record<string, string>[]>([]);
+    const [outputFormat, setOutputFormat] = useState<'csv' | 'tsv' | 'json' | 'excel'>('csv');
 
     const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
@@ -113,7 +120,8 @@ export default function Home() {
                     data: sample,
                     headers: fileData.headers,
                     transformationPrompt,
-                    hasHeaders: fileData.hasHeaders
+                    hasHeaders: fileData.hasHeaders,
+                    outputFormat // Include the desired output format
                 }),
             });
 
@@ -122,7 +130,24 @@ export default function Home() {
             }
 
             const result = await response.json();
-            setTransformedData(result.transformedData);
+
+            if (outputFormat === 'json') {
+                // Handle JSON format
+                setTransformedJsonData(result.transformedData);
+                // Also convert to array format for display compatibility
+                setTransformedData(convertJsonObjectsToArray(
+                    result.transformedData,
+                    result.headers || fileData.headers
+                ));
+            } else {
+                // Handle CSV/TSV/Excel formats (array-based)
+                setTransformedData(result.transformedData);
+                // Also convert to JSON objects for potential JSON download
+                setTransformedJsonData(convertArrayToJsonObjects(
+                    result.transformedData,
+                    fileData.headers
+                ));
+            }
 
             // Switch to the transformed data tab after transformation
             setTabValue(1);
@@ -133,6 +158,7 @@ export default function Home() {
         }
     };
 
+// Update the transformAllData function similarly
     const transformAllData = async (): Promise<string[][]> => {
         if (!fileData || !transformationPrompt.trim()) {
             setError('Please upload a file and provide transformation instructions');
@@ -146,6 +172,7 @@ export default function Home() {
             // Process data in batches to avoid timeout
             const batchSize = 100;
             let allTransformedRows: string[][] = [];
+            let allTransformedJsonRows: Record<string, string>[] = [];
 
             for (let i = 0; i < fileData.data.length; i += batchSize) {
                 const batch = fileData.data.slice(i, i + batchSize);
@@ -159,7 +186,8 @@ export default function Home() {
                         data: batch,
                         headers: fileData.headers,
                         transformationPrompt,
-                        hasHeaders: fileData.hasHeaders
+                        hasHeaders: fileData.hasHeaders,
+                        outputFormat
                     }),
                 });
 
@@ -168,11 +196,32 @@ export default function Home() {
                 }
 
                 const result = await response.json();
-                allTransformedRows = [...allTransformedRows, ...result.transformedData];
+
+                if (outputFormat === 'json') {
+                    // Handle JSON format
+                    allTransformedJsonRows = [...allTransformedJsonRows, ...result.transformedData];
+                    // Also convert for array compatibility
+                    const arrayData = convertJsonObjectsToArray(
+                        result.transformedData,
+                        result.headers || fileData.headers
+                    );
+                    allTransformedRows = [...allTransformedRows, ...arrayData];
+                } else {
+                    // Handle CSV/TSV/Excel formats (array-based)
+                    allTransformedRows = [...allTransformedRows, ...result.transformedData];
+                    // Also convert to JSON objects
+                    const jsonData = convertArrayToJsonObjects(
+                        result.transformedData,
+                        fileData.headers
+                    );
+                    allTransformedJsonRows = [...allTransformedJsonRows, ...jsonData];
+                }
             }
 
             // Update the state with all transformed data
             setTransformedData(allTransformedRows);
+            setTransformedJsonData(allTransformedJsonRows);
+
             return allTransformedRows;
         } catch (err) {
             setError(`Error transforming data: ${err instanceof Error ? err.message : String(err)}`);

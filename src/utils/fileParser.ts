@@ -163,7 +163,7 @@ const parseExcel = async (file: File, hasHeaders: boolean): Promise<FileData> =>
                 const worksheet = workbook.Sheets[firstSheetName];
 
                 // Convert to JSON
-                const jsonData = XLSX.utils.sheet_to_json<any>(worksheet, { header: 1 });
+                const jsonData = XLSX.utils.sheet_to_json<unknown>(worksheet, { header: 1 });
 
                 if (jsonData.length === 0) {
                     resolve({ headers: [], data: [], hasHeaders });
@@ -175,14 +175,14 @@ const parseExcel = async (file: File, hasHeaders: boolean): Promise<FileData> =>
 
                 if (hasHeaders) {
                     // Extract headers and data
-                    headers = (jsonData[0] as any[]).map(h => h?.toString() || '');
+                    headers = (jsonData[0] as unknown[]).map(h => h?.toString() || '');
                     rowData = jsonData.slice(1).map(row =>
-                        (row as any[]).map(cell => cell?.toString() || '')
+                        (row as unknown[]).map(cell => cell?.toString() || '')
                     );
                 } else {
                     // All rows are data
                     rowData = jsonData.map(row =>
-                        (row as any[]).map(cell => cell?.toString() || '')
+                        (row as unknown[]).map(cell => cell?.toString() || '')
                     );
 
                     // Generate default column headers based on first row
@@ -204,4 +204,52 @@ const parseExcel = async (file: File, hasHeaders: boolean): Promise<FileData> =>
 
         reader.readAsArrayBuffer(file);
     });
+};
+
+// Add these functions to src/utils/fileParser.ts or create a new file
+
+/**
+ * Converts array data to structured JSON objects with column headers as keys
+ */
+export const convertArrayToJsonObjects = (data: string[][], headers: string[]): Record<string, string>[] => {
+    return data.map(row => {
+        const obj: Record<string, string> = {};
+        headers.forEach((header, index) => {
+            if (index < row.length) {
+                obj[header] = row[index];
+            } else {
+                obj[header] = '';
+            }
+        });
+        return obj;
+    });
+};
+
+/**
+ * Converts structured JSON objects to array data
+ */
+export const convertJsonObjectsToArray = (
+    jsonObjects: Record<string, string>[],
+    headers: string[]
+): string[][] => {
+    return jsonObjects.map(obj => {
+        return headers.map(header => obj[header] || '');
+    });
+};
+
+/**
+ * Updates the headers based on the keys in the JSON objects
+ */
+export const extractHeadersFromJsonObjects = (
+    jsonObjects: Record<string, string>[]
+): string[] => {
+    if (jsonObjects.length === 0) return [];
+
+    // Get all unique keys from all objects
+    const allKeys = new Set<string>();
+    jsonObjects.forEach(obj => {
+        Object.keys(obj).forEach(key => allKeys.add(key));
+    });
+
+    return Array.from(allKeys);
 };
