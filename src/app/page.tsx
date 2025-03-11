@@ -205,8 +205,17 @@ export default function Home() {
         try {
             setIsLoading(true);
 
-            // First transform all data if needed
-            const dataToDownload = transformedData.length > 0 ? transformedData : await transformAllData();
+            // Get the full transformed data
+            let dataToDownload: Record<string, string>[];
+
+            // Check if we're using the preview data or need to transform all data
+            if (transformedData.length === fileData.data.length) {
+                // If we've already transformed all data, use that
+                dataToDownload = transformedData;
+            } else {
+                // Otherwise, transform all data now
+                dataToDownload = await transformAllData();
+            }
 
             // Get all unique column keys from transformed data
             const transformedHeaders = dataToDownload.length > 0
