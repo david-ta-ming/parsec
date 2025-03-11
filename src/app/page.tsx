@@ -28,6 +28,11 @@ import TransformationPreview from '@/components/TransformationPreview';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import {parseFile, FileData} from '@/utils/fileParser';
+import {
+    convertArrayToJsonObjects,
+    convertJsonObjectsToArray
+} from '@/utils/fileParser';
+import Papa from "papaparse";
 
 // Interface for the tabs
 interface TabPanelProps {
@@ -60,12 +65,12 @@ export default function Home() {
     const [fileData, setFileData] = useState<FileData | null>(null);
     const [fileName, setFileName] = useState<string>('');
     const [, setFileType] = useState<string>('');
-    const [transformedData, setTransformedData] = useState<string[][]>([]);
     const [transformationPrompt, setTransformationPrompt] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [tabValue, setTabValue] = useState<number>(0);
     const [isTransformingFullData, setIsTransformingFullData] = useState<boolean>(false);
+    const [transformedData, setTransformedData] = useState<Record<string, string>[]>([]);
 
     const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
@@ -104,16 +109,20 @@ export default function Home() {
             // Only send a sample of the data for transformation
             const sample = fileData.data.slice(0, Math.min(10, fileData.data.length));
 
+            // Convert sample data to JSON objects before sending to API
+            const sampleObjects = convertArrayToJsonObjects(sample, fileData.headers);
+
             const response = await fetch('/api/transform', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    data: sample,
+                    data: sampleObjects,
                     headers: fileData.headers,
                     transformationPrompt,
-                    hasHeaders: fileData.hasHeaders
+                    hasHeaders: fileData.hasHeaders,
+                    outputFormat: 'json' // Always request JSON from the API
                 }),
             });
 
@@ -122,6 +131,8 @@ export default function Home() {
             }
 
             const result = await response.json();
+
+            // Store the transformed data in our standard format
             setTransformedData(result.transformedData);
 
             // Switch to the transformed data tab after transformation
@@ -133,7 +144,8 @@ export default function Home() {
         }
     };
 
-    const transformAllData = async (): Promise<string[][]> => {
+    // Update the transformAllData function similarly
+    const transformAllData = async (): Promise<Record<string, string>[]> => {
         if (!fileData || !transformationPrompt.trim()) {
             setError('Please upload a file and provide transformation instructions');
             throw new Error('Missing file data or transformation prompt');
@@ -145,10 +157,13 @@ export default function Home() {
 
             // Process data in batches to avoid timeout
             const batchSize = 100;
-            let allTransformedRows: string[][] = [];
+            let allTransformedRows: Record<string, string>[] = [];
 
             for (let i = 0; i < fileData.data.length; i += batchSize) {
                 const batch = fileData.data.slice(i, i + batchSize);
+
+                // Convert batch to JSON objects
+                const batchObjects = convertArrayToJsonObjects(batch, fileData.headers);
 
                 const response = await fetch('/api/transform', {
                     method: 'POST',
@@ -156,10 +171,11 @@ export default function Home() {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        data: batch,
+                        data: batchObjects,
                         headers: fileData.headers,
                         transformationPrompt,
-                        hasHeaders: fileData.hasHeaders
+                        hasHeaders: fileData.hasHeaders,
+                        outputFormat: 'json' // Always request JSON from the API
                     }),
                 });
 
@@ -173,6 +189,7 @@ export default function Home() {
 
             // Update the state with all transformed data
             setTransformedData(allTransformedRows);
+
             return allTransformedRows;
         } catch (err) {
             setError(`Error transforming data: ${err instanceof Error ? err.message : String(err)}`);
@@ -189,7 +206,12 @@ export default function Home() {
             setIsLoading(true);
 
             // First transform all data if needed
-            const dataToDownload = await transformAllData();
+            const dataToDownload = transformedData.length > 0 ? transformedData : await transformAllData();
+
+            // Get all unique column keys from transformed data
+            const transformedHeaders = dataToDownload.length > 0
+                ? Object.keys(dataToDownload[0])
+                : fileData.headers;
 
             let content: string | Blob;
             let mimeType: string;
@@ -197,89 +219,43 @@ export default function Home() {
 
             switch (format) {
                 case 'csv':
-                    // For CSV files, we need to handle quoted values properly
-                    let csvContent = '';
-
-                    // Add headers if the original file had them
-                    if (fileData.hasHeaders) {
-                        const headerLine = fileData.headers.map(header => {
-                            // Check if header contains characters that need quoting
-                            if (header.includes(',') || header.includes('"') || header.includes('\n')) {
-                                return `"${header.replace(/"/g, '""')}"`;
-                            }
-                            return header;
-                        }).join(',');
-                        csvContent += headerLine + '\n';
-                    }
-
-                    // Add the data rows
-                    csvContent += dataToDownload.map(row => {
-                        return row.map(value => {
-                            // Quote values containing commas, quotes, or newlines
-                            if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-                                return `"${value.replace(/"/g, '""')}"`;
-                            }
-                            return value;
-                        }).join(',');
-                    }).join('\n');
-
-                    content = csvContent;
-                    mimeType = 'text/csv';
-                    break;
-
                 case 'tsv':
-                    // For TSV, replace tabs in values with spaces to avoid delimiter confusion
-                    let tsvContent = '';
+                    // Convert JSON objects to arrays for CSV/TSV output
+                    // Use transformedHeaders instead of original headers
+                    const dataArray = convertJsonObjectsToArray(dataToDownload, transformedHeaders);
 
-                    // Add headers if the original file had them
-                    if (fileData.hasHeaders) {
-                        const headerLine = fileData.headers.map(header =>
-                            header.replace(/\t/g, ' ')
-                        ).join('\t');
-                        tsvContent += headerLine + '\n';
-                    }
+                    // Use Papa Parse to generate CSV/TSV
+                    const config: Papa.UnparseConfig = {
+                        delimiter: format === 'tsv' ? '\t' : ',',
+                        header: true, // Always include headers for better clarity
+                        quotes: true,
+                    };
 
-                    // Add the data rows
-                    tsvContent += dataToDownload.map(row => {
-                        return row.map(value => value.replace(/\t/g, ' ')).join('\t');
-                    }).join('\n');
+                    // Create array with headers as first row
+                    const dataWithHeaders = [transformedHeaders, ...dataArray];
 
-                    content = tsvContent;
-                    mimeType = 'text/tab-separated-values';
+                    content = Papa.unparse(dataWithHeaders, config);
+                    mimeType = format === 'csv' ? 'text/csv' : 'text/tab-separated-values';
                     break;
 
                 case 'json':
-                    // Create JSON with headers as keys if original file had headers
-                    let jsonData;
-                    if (fileData.hasHeaders) {
-                        jsonData = dataToDownload.map(row => {
-                            const rowObj: Record<string, string> = {};
-                            fileData.headers.forEach((header, index) => {
-                                if (index < row.length) {
-                                    rowObj[header] = row[index];
-                                } else {
-                                    rowObj[header] = '';
-                                }
-                            });
-                            return rowObj;
-                        });
-                    } else {
-                        jsonData = dataToDownload;
-                    }
-                    content = JSON.stringify(jsonData, null, 2);
+                    // Use JSON objects directly
+                    content = JSON.stringify(dataToDownload, null, 2);
                     mimeType = 'application/json';
                     break;
 
                 case 'excel':
+                    // Convert JSON objects to arrays for Excel output
+                    // Use transformedHeaders instead of original headers
+                    const excelDataArray = convertJsonObjectsToArray(dataToDownload, transformedHeaders);
+
                     // Create Excel file using the xlsx library
                     import('xlsx').then(XLSX => {
                         // Create a new workbook
                         const wb = XLSX.utils.book_new();
 
-                        // Add data with or without headers
-                        const excelData = fileData.hasHeaders
-                            ? [fileData.headers, ...dataToDownload]
-                            : dataToDownload;
+                        // Add data with headers
+                        const excelData = [transformedHeaders, ...excelDataArray];
 
                         // Create a worksheet from the data
                         const ws = XLSX.utils.aoa_to_sheet(excelData);
@@ -293,26 +269,16 @@ export default function Home() {
                         // Create a Blob from the buffer
                         const blob = new Blob([excelBuffer], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 
-                        // Create a filename with the xlsx extension
-                        const baseName = fileName.split('.')[0] || 'transformed_data';
-                        const excelFilename = `${baseName}_transformed.xlsx`;
-
                         // Trigger download
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = excelFilename;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
+                        downloadFile(blob, `${fileName.split('.')[0] || 'transformed_data'}_transformed.xlsx`);
                         setIsLoading(false);
                     });
                     return; // Early return since Excel handling is async
 
                 default:
                     // Fallback to CSV
-                    content = dataToDownload.map(row => row.join(',')).join('\n');
+                    const fallbackArray = convertJsonObjectsToArray(dataToDownload, transformedHeaders);
+                    content = Papa.unparse(fallbackArray);
                     mimeType = 'text/csv';
                     outputExtension = 'csv';
             }
@@ -323,19 +289,23 @@ export default function Home() {
 
             // For non-Excel formats (which return early)
             const blob = new Blob([content as string], {type: mimeType});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = outputFilename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            downloadFile(blob, outputFilename);
         } catch (err) {
             setError(`Error downloading file: ${err instanceof Error ? err.message : String(err)}`);
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const downloadFile = (blob: Blob, filename: string) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
 
     // Create a data preview component using Material UI components
@@ -434,7 +404,7 @@ export default function Home() {
                                 </Alert>
                             )}
 
-                            <Box sx={{display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap'}}>
+                            <Box sx={{display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', justifyContent: 'space-between'}}>
                                 {fileData && (
                                     <Button
                                         variant="contained"
@@ -446,7 +416,7 @@ export default function Home() {
                                 )}
 
                                 {transformedData.length > 0 && (
-                                    <Box sx={{display: 'flex', gap: 1}}>
+                                    <Box sx={{display: 'flex', gap: 1, ml: 'auto'}}>
                                         <Typography variant="body2" sx={{mr: 1, alignSelf: 'center'}}>
                                             Download as:
                                         </Typography>

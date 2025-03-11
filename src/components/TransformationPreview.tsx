@@ -1,4 +1,3 @@
-// Updated TransformationPreview.tsx
 import {
     Box,
     Table,
@@ -14,16 +13,18 @@ import { FileData } from '@/utils/fileParser';
 
 interface TransformationPreviewProps {
     originalData: FileData;
-    transformedData: string[][];
+    transformedData: Record<string, string>[];
 }
 
 export default function TransformationPreview({ originalData, transformedData }: TransformationPreviewProps) {
     // Display at most 10 rows to prevent UI lag
-    const displayRowCount = Math.min(10, originalData.data.length, transformedData.length);
+    const displayRowCount = Math.min(10, transformedData.length);
     const transformedDisplayData = transformedData.slice(0, displayRowCount);
 
-    // Ensure the headers match the original headers
-    const displayHeaders = originalData.headers.map(header => header || '');
+    // Get headers from the first transformed row, or use the original headers
+    const headers = transformedData.length > 0
+        ? Object.keys(transformedData[0])
+        : originalData.headers;
 
     return (
         <Box sx={{ mb: 4 }}>
@@ -36,7 +37,7 @@ export default function TransformationPreview({ originalData, transformedData }:
                     <TableHead>
                         <TableRow>
                             <TableCell>#</TableCell>
-                            {displayHeaders.map((header, index) => (
+                            {headers.map((header, index) => (
                                 <TableCell key={index}>
                                     {header || `Column ${index + 1}`}
                                 </TableCell>
@@ -47,17 +48,11 @@ export default function TransformationPreview({ originalData, transformedData }:
                         {transformedDisplayData.map((row, rowIndex) => (
                             <TableRow key={rowIndex}>
                                 <TableCell>{rowIndex + 1}</TableCell>
-                                {row.map((cell, cellIndex) => {
-                                    // Only show data for columns that exist in the original headers
-                                    if (cellIndex < displayHeaders.length) {
-                                        return (
-                                            <TableCell key={cellIndex}>
-                                                {cell}
-                                            </TableCell>
-                                        );
-                                    }
-                                    return null;
-                                })}
+                                {headers.map((header, cellIndex) => (
+                                    <TableCell key={cellIndex}>
+                                        {row[header] || ''}
+                                    </TableCell>
+                                ))}
                             </TableRow>
                         ))}
                     </TableBody>

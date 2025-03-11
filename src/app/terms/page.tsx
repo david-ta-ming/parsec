@@ -1,5 +1,3 @@
-'use client';
-
 import { Box, Container, Typography, Paper, Button } from '@mui/material';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -32,7 +30,7 @@ export default function TermsOfService() {
                         Introduction
                     </Typography>
                     <Typography variant="body1" paragraph>
-                        Welcome to Parsec. By accessing or using our services, you agree to be bound by these Terms of Service ("Terms"). Please read them carefully.
+                        Welcome to Parsec. By accessing or using our services, you agree to be bound by these Terms of Service (&#34;Terms&#34;). Please read them carefully.
                     </Typography>
 
                     <Typography variant="h5" component="h2" sx={{ mt: 4, mb: 2 }}>
@@ -92,7 +90,7 @@ export default function TermsOfService() {
                         No Warranties
                     </Typography>
                     <Typography variant="body1" paragraph>
-                        Parsec is provided "as is" without warranties of any kind, either express or implied. We do not guarantee that:
+                        Parsec is provided &#34;as is&#34; without warranties of any kind, either express or implied. We do not guarantee that:
                     </Typography>
                     <ul>
                         <Typography component="li" variant="body1">The service will meet your specific requirements</Typography>
