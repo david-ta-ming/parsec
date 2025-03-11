@@ -104,7 +104,8 @@ Transform ALL rows according to the instructions. Return the transformed data as
                     {role: 'user', content: `Transform these rows:\n${JSON.stringify(batch, null, 2)}`}
                 ],
                 temperature: 0, // Use zero temperature for deterministic results
-                response_format: {type: "json_object"}
+                max_tokens: 30000,
+                response_format: { type: "json_object" }
             };
 
             logger.debug('Sending OpenAI request', requestPayload);
