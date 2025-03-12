@@ -22,10 +22,16 @@ frontend:
           else
             echo "✅ LOG_LEVEL is set to $LOG_LEVEL"
           fi
+        - |
+          if [ -z "$NEXT_PUBLIC_SUPPORT_EMAIL" ]; then
+            echo "WARNING: NEXT_PUBLIC_SUPPORT_EMAIL environment variable is not set, support link will be hidden"
+          else
+            echo "✅ NEXT_PUBLIC_SUPPORT_EMAIL is set to $NEXT_PUBLIC_SUPPORT_EMAIL"
+          fi
         - yarn install
     build:
       commands:
-        - env | grep -e OPENAI_API_KEY -e OPENAI_MODEL -e LOG_LEVEL >> .env.production
+        - env | grep -e OPENAI_API_KEY -e OPENAI_MODEL -e LOG_LEVEL -e NEXT_PUBLIC_SUPPORT_EMAIL >> .env.production
         - yarn run build
   artifacts:
     baseDirectory: .next
