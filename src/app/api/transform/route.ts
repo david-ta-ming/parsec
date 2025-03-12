@@ -2,6 +2,9 @@ import {NextRequest, NextResponse} from 'next/server';
 import OpenAI from 'openai';
 import logger from '@/utils/logger';
 
+const MAX_RETRY_ATTEMPTS = 3;
+const BATCH_SIZE = 30;
+
 // Initialize OpenAI client
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || '',
@@ -67,7 +70,7 @@ Follow these strict rules:
         }
 
         // Create example rows for the prompt
-        const exampleRows = dataJson.slice(0, 5);
+        const exampleRows = dataJson.slice(0, 3);
 
         // Create a JSON representation of the headers and example data
         const dataStructure = {
@@ -90,11 +93,10 @@ ${JSON.stringify(dataStructure, null, 2)}`;
 Transform ALL rows according to the instructions. Return the transformed data as a JSON object where each row is represented as an object with column headers as keys.`;
 
         // Process data in batches to avoid token limits
-        const batchSize = 30;
         const batchPromises = [];
 
-        for (let i = 0; i < dataJson.length; i += batchSize) {
-            const batch = dataJson.slice(i, Math.min(i + batchSize, dataJson.length));
+        for (let i = 0; i < dataJson.length; i += BATCH_SIZE) {
+            const batch = dataJson.slice(i, Math.min(i + BATCH_SIZE, dataJson.length));
 
             const requestPayload: OpenAI.Chat.ChatCompletionCreateParams = {
                 model: MODEL,
@@ -113,9 +115,8 @@ Transform ALL rows according to the instructions. Return the transformed data as
             batchPromises.push(
                 (async () => {
                     let attempt = 0;
-                    const maxRetries = 3;
 
-                    while (attempt < maxRetries) {
+                    while (attempt < MAX_RETRY_ATTEMPTS) {
                         try {
                             const response = await openai.chat.completions.create(requestPayload);
                             const content = response.choices[0].message.content?.trim() || '{}';
@@ -140,9 +141,9 @@ Transform ALL rows according to the instructions. Return the transformed data as
                         attempt++;
                     }
 
-                    logger.error(`Batch ${i} failed after ${maxRetries} retries.`);
+                    logger.error(`Batch ${i} failed after ${MAX_RETRY_ATTEMPTS} retries.`);
 
-                    throw new Error(`Batch ${i} failed after ${maxRetries} retries.`);
+                    throw new Error(`Batch ${i} failed after ${MAX_RETRY_ATTEMPTS} retries.`);
                 })()
             );
 
