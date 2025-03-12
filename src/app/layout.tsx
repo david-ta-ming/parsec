@@ -13,18 +13,23 @@ const roboto = Roboto({
     display: 'swap',
 });
 
+// Enhanced metadata for better SEO
 export const metadata: Metadata = {
     title: "Parsec - AI-Powered Data Transformation Tool",
-    description: "Transform CSV, TSV, Excel, and text data with natural language instructions. No data storage, privacy-focused, and instant downloads.",
+    description: "Transform CSV, Excel, and text data with natural language instructions. No coding required. Process data files instantly with AI.",
+    keywords: "data transformation, AI data tool, CSV converter, Excel transformation, data processing",
     metadataBase: new URL('https://parsec.baritoneblowfish.com'),
+    alternates: {
+        canonical: '/',
+    },
     openGraph: {
-        title: 'Parsec - Transform Data with AI',
-        description: 'Convert, clean, and transform your data files with simple English instructions',
+        title: "Parsec - Transform Your Data with AI",
+        description: "Convert, clean, and transform data files using plain English instructions",
         url: 'https://parsec.baritoneblowfish.com',
         siteName: 'Parsec',
         images: [
             {
-                url: '/og-image.png',
+                url: '/social-image.png',
                 width: 1200,
                 height: 630,
                 alt: 'Parsec - AI Data Transformation Tool',
@@ -36,14 +41,49 @@ export const metadata: Metadata = {
     twitter: {
         card: 'summary_large_image',
         title: 'Parsec - AI-Powered Data Transformation',
-        description: 'Transform your data files with natural language instructions',
-        images: ['/twitter-image.png'],
+        description: 'Transform CSV, Excel, and text data with natural language instructions',
+        images: ['/social-image.png'],
     },
-    keywords: 'data transformation, CSV transformation, Excel conversion, AI data processing, no-code data tools',
     icons: {
         icon: '/favicon.svg',
+        apple: '/apple-icon.png',
+    },
+    robots: {
+        index: true,
+        follow: true,
+    },
+    verification: {
+        // Add your Google Search Console verification code here if you have one
+        google: 'your-google-verification-code',
     },
 };
+
+// Structured data for rich search results
+function StructuredData() {
+    return (
+        <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+                __html: JSON.stringify({
+                    "@context": "https://schema.org",
+                    "@type": "SoftwareApplication",
+                    "name": "Parsec",
+                    "applicationCategory": "BusinessApplication",
+                    "operatingSystem": "Web",
+                    "offers": {
+                        "@type": "Offer",
+                        "price": "0",
+                        "priceCurrency": "USD"
+                    },
+                    "description": "Transform data files using AI and natural language instructions",
+                    "url": "https://parsec.baritoneblowfish.com",
+                    "datePublished": "2025-03-06",
+                    "softwareVersion": "0.1.0"
+                })
+            }}
+        />
+    );
+}
 
 export default function RootLayout({
                                        children,
@@ -52,6 +92,14 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en">
+        <head>
+            {/* This helps with font display */}
+            <link rel="preconnect" href="https://fonts.googleapis.com"/>
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous"/>
+
+            {/* Add structured data for rich search results */}
+            <StructuredData/>
+        </head>
         <body className={roboto.className}>
         <AppRouterCacheProvider>
             <ThemeProvider theme={theme}>
