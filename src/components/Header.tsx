@@ -1,6 +1,7 @@
-import { AppBar, Toolbar, Typography, Box, Button, Container } from '@mui/material';
+import { AppBar, Toolbar, Typography, Box, Container, Button } from '@mui/material';
+import Link from 'next/link';
 import ParsecLogo from './ParsecLogo';
-import GitHubIcon from '@mui/icons-material/GitHub';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 
 export default function Header() {
     return (
@@ -8,31 +9,28 @@ export default function Header() {
             <Container maxWidth="lg">
                 <Toolbar disableGutters sx={{ height: 64 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
-                        <ParsecLogo sx={{ mr: 1 }} />
-                        <Typography
-                            variant="h6"
-                            noWrap
-                            component="div"
-                            sx={{ fontWeight: 700, letterSpacing: '-0.01em' }}
-                        >
-                            Parsec
-                        </Typography>
+                        <Link href="/" passHref style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
+                            <ParsecLogo sx={{ mr: 1 }} />
+                            <Typography
+                                variant="h6"
+                                noWrap
+                                component="div"
+                                sx={{ fontWeight: 700, letterSpacing: '-0.01em', color: 'text.primary' }}
+                            >
+                                Parsec
+                            </Typography>
+                        </Link>
                     </Box>
-
                     <Box sx={{ flexGrow: 1 }} />
-
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Button
-                            color="inherit"
-                            startIcon={<GitHubIcon />}
-                            href="https://github.com/david-ta-ming/parsec"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            sx={{ textTransform: 'none' }}
-                        >
-                            GitHub
-                        </Button>
-                    </Box>
+                    <Button
+                        component={Link}
+                        href="/how-to-use"
+                        color="inherit"
+                        startIcon={<MenuBookIcon />}
+                        sx={{ textTransform: 'none' }}
+                    >
+                        How to Use
+                    </Button>
                 </Toolbar>
             </Container>
         </AppBar>
