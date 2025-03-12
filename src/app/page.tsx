@@ -34,6 +34,9 @@ import {
 } from '@/utils/fileParser';
 import Papa from "papaparse";
 
+// Process data in batches to avoid timeout
+const BATCH_SIZE: number = 100;
+
 // Interface for the tabs
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -155,12 +158,10 @@ export default function Home() {
             setIsTransformingFullData(true);
             setError(null);
 
-            // Process data in batches to avoid timeout
-            const batchSize = 100;
             let allTransformedRows: Record<string, string>[] = [];
 
-            for (let i = 0; i < fileData.data.length; i += batchSize) {
-                const batch = fileData.data.slice(i, i + batchSize);
+            for (let i = 0; i < fileData.data.length; i += BATCH_SIZE) {
+                const batch = fileData.data.slice(i, i + BATCH_SIZE);
 
                 // Convert batch to JSON objects
                 const batchObjects = convertArrayToJsonObjects(batch, fileData.headers);
