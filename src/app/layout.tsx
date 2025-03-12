@@ -52,10 +52,6 @@ export const metadata: Metadata = {
         index: true,
         follow: true,
     },
-    verification: {
-        // Add your Google Search Console verification code here if you have one
-        google: 'your-google-verification-code',
-    },
 };
 
 // Structured data for rich search results
