@@ -1,6 +1,6 @@
 'use client';
 
-import {useState} from 'react';
+import {useState, useRef} from 'react';
 import {
     Box,
     Typography,
@@ -27,6 +27,7 @@ import FileUpload from '@/components/FileUpload';
 import TransformationPreview from '@/components/TransformationPreview';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import TransformationProgressModal from '@/components/TransformationProgressModal';
 import {parseFile, FileData} from '@/utils/fileParser';
 import {
     convertArrayToJsonObjects,
@@ -74,6 +75,11 @@ export default function Home() {
     const [tabValue, setTabValue] = useState<number>(0);
     const [isTransformingFullData, setIsTransformingFullData] = useState<boolean>(false);
     const [transformedData, setTransformedData] = useState<Record<string, string>[]>([]);
+    const [transformProgress, setTransformProgress] = useState<number>(0);
+    const [transformationStage, setTransformationStage] = useState<string>('');
+    const [showIndeterminateProgress, setShowIndeterminateProgress] = useState<boolean>(false);
+    const [isCancelling, setIsCancelling] = useState<boolean>(false);
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
@@ -97,6 +103,25 @@ export default function Home() {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleCancelTransformation = () => {
+        setIsCancelling(true);
+
+        // Abort any ongoing fetch requests
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+
+        // Clean up state after a short delay to show cancellation is in progress
+        setTimeout(() => {
+            setIsTransformingFullData(false);
+            setTransformProgress(0);
+            setTransformationStage('');
+            setShowIndeterminateProgress(false);
+            setIsCancelling(false);
+            setError(null);
+        }, 500);
     };
 
     const handleTransform = async () => {
@@ -147,7 +172,7 @@ export default function Home() {
         }
     };
 
-    // Update the transformAllData function similarly
+    // Update the transformAllData function with progress tracking and cancellation
     const transformAllData = async (): Promise<Record<string, string>[]> => {
         if (!fileData || !transformationPrompt.trim()) {
             setError('Please upload a file and provide transformation instructions');
@@ -155,16 +180,40 @@ export default function Home() {
         }
 
         try {
+            // Create a new AbortController for this operation
+            abortControllerRef.current = new AbortController();
+            const signal = abortControllerRef.current.signal;
+
+            // Set initial states
             setIsTransformingFullData(true);
+            setTransformProgress(0);
+            setTransformationStage('Initializing transformation...');
+            setShowIndeterminateProgress(true);
             setError(null);
 
             let allTransformedRows: Record<string, string>[] = [];
+            const totalBatches = Math.ceil(fileData.data.length / BATCH_SIZE);
+
+            // Create a timeout to give immediate feedback to the user
+            await new Promise(resolve => setTimeout(resolve, 300));
 
             for (let i = 0; i < fileData.data.length; i += BATCH_SIZE) {
+                // Check if operation was cancelled
+                if (signal.aborted) {
+                    throw new Error('Operation cancelled by user');
+                }
+
                 const batch = fileData.data.slice(i, i + BATCH_SIZE);
+                const currentBatch = Math.floor(i / BATCH_SIZE) + 1;
+
+                // Update the stage message before each batch
+                setTransformationStage(`Preparing batch ${currentBatch} of ${totalBatches}...`);
 
                 // Convert batch to JSON objects
                 const batchObjects = convertArrayToJsonObjects(batch, fileData.headers);
+
+                // Update the stage message before API call
+                setTransformationStage(`Processing batch ${currentBatch} of ${totalBatches}...`);
 
                 const response = await fetch('/api/transform', {
                     method: 'POST',
@@ -178,6 +227,7 @@ export default function Home() {
                         hasHeaders: fileData.hasHeaders,
                         outputFormat: 'json' // Always request JSON from the API
                     }),
+                    signal, // Pass the abort signal to fetch
                 });
 
                 if (!response.ok) {
@@ -185,18 +235,48 @@ export default function Home() {
                 }
 
                 const result = await response.json();
+
+                // Switch to determinate progress after first batch completes
+                if (i === 0) {
+                    setShowIndeterminateProgress(false);
+                }
+
                 allTransformedRows = [...allTransformedRows, ...result.transformedData];
+
+                // Update progress
+                const progressPercentage = Math.round((currentBatch / totalBatches) * 100);
+                setTransformProgress(progressPercentage);
+                setTransformationStage(`Transformed ${currentBatch * BATCH_SIZE > fileData.data.length ?
+                    fileData.data.length : currentBatch * BATCH_SIZE} of ${fileData.data.length} rows (${progressPercentage}%)...`);
             }
+
+            // Final stage message
+            setTransformationStage('Finalizing results...');
+
+            // Add a small delay to show the 100% state before completion
+            await new Promise(resolve => setTimeout(resolve, 500));
 
             // Update the state with all transformed data
             setTransformedData(allTransformedRows);
-
             return allTransformedRows;
         } catch (err) {
-            setError(`Error transforming data: ${err instanceof Error ? err.message : String(err)}`);
-            throw err;
+            // Handle aborted operation differently from other errors
+            if (err instanceof Error && err.name === 'AbortError') {
+                console.log('Operation cancelled by user');
+                return []; // Return empty array instead of throwing
+            } else {
+                setError(`Error transforming data: ${err instanceof Error ? err.message : String(err)}`);
+                throw err;
+            }
         } finally {
-            setIsTransformingFullData(false);
+            // Clean up regardless of outcome
+            if (!isCancelling) {
+                setIsTransformingFullData(false);
+                setTransformProgress(0);
+                setTransformationStage('');
+                setShowIndeterminateProgress(false);
+            }
+            abortControllerRef.current = null;
         }
     };
 
@@ -216,6 +296,12 @@ export default function Home() {
             } else {
                 // Otherwise, transform all data now
                 dataToDownload = await transformAllData();
+
+                // If dataToDownload is empty, the transformation was cancelled
+                if (dataToDownload.length === 0) {
+                    setIsLoading(false);
+                    return; // Exit early
+                }
             }
 
             // Get all unique column keys from transformed data
@@ -231,13 +317,12 @@ export default function Home() {
                 case 'csv':
                 case 'tsv':
                     // Convert JSON objects to arrays for CSV/TSV output
-                    // Use transformedHeaders instead of original headers
                     const dataArray = convertJsonObjectsToArray(dataToDownload, transformedHeaders);
 
                     // Use Papa Parse to generate CSV/TSV
                     const config: Papa.UnparseConfig = {
                         delimiter: format === 'tsv' ? '\t' : ',',
-                        header: true, // Always include headers for better clarity
+                        header: true,
                         quotes: true,
                     };
 
@@ -256,7 +341,6 @@ export default function Home() {
 
                 case 'excel':
                     // Convert JSON objects to arrays for Excel output
-                    // Use transformedHeaders instead of original headers
                     const excelDataArray = convertJsonObjectsToArray(dataToDownload, transformedHeaders);
 
                     // Create Excel file using the xlsx library
@@ -367,11 +451,12 @@ export default function Home() {
             </Box>
         );
     };
+
     return (
-        <Box sx={{display: 'flex', flexDirection: 'column', minHeight: '100vh'}}>
-            <Header/>
-            <Container maxWidth="lg" sx={{mt: 4, mb: 4, flex: '1 0 auto'}}>
-                <Paper sx={{p: 3, mb: 4}}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+            <Header />
+            <Container maxWidth="lg" sx={{ mt: 4, mb: 4, flex: '1 0 auto' }}>
+                <Paper sx={{ p: 3, mb: 4 }}>
                     <Typography variant="h4" component="h1" gutterBottom>
                         Transform Data with AI
                     </Typography>
@@ -380,20 +465,20 @@ export default function Home() {
                         your data according to your instructions.
                     </Typography>
 
-                    <FileUpload onFileUpload={handleFileUpload}/>
+                    <FileUpload onFileUpload={handleFileUpload} />
 
                     {error && (
-                        <Alert severity="error" sx={{mt: 2}}>
+                        <Alert severity="error" sx={{ mt: 2 }}>
                             {error}
                         </Alert>
                     )}
 
                     {fileData && (
-                        <Box sx={{mt: 3}}>
+                        <Box sx={{ mt: 3 }}>
                             <Typography variant="h6">
                                 File: {fileName}
                             </Typography>
-                            <Typography variant="body2" sx={{mb: 2}}>
+                            <Typography variant="body2" sx={{ mb: 2 }}>
                                 {fileData.data.length} rows of data {!fileData.hasHeaders && '(no headers detected)'}
                             </Typography>
 
@@ -405,29 +490,23 @@ export default function Home() {
                                 value={transformationPrompt}
                                 onChange={(e) => setTransformationPrompt(e.target.value)}
                                 placeholder="Example: Convert dates from MM/DD/YYYY to YYYY-MM-DD format, capitalize all names, and format phone numbers as (XXX) XXX-XXXX"
-                                sx={{mb: 2}}
+                                sx={{ mb: 2 }}
                             />
 
-                            {isTransformingFullData && (
-                                <Alert severity="info" sx={{mt: 2, mb: 2}}>
-                                    Transforming all data. This may take a moment for larger datasets...
-                                </Alert>
-                            )}
-
-                            <Box sx={{display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', justifyContent: 'space-between'}}>
+                            <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', justifyContent: 'space-between' }}>
                                 {fileData && (
                                     <Button
                                         variant="contained"
                                         onClick={handleTransform}
-                                        disabled={isLoading || !transformationPrompt.trim()}
+                                        disabled={isLoading || !transformationPrompt.trim() || isTransformingFullData}
                                     >
                                         Preview Transformation
                                     </Button>
                                 )}
 
                                 {transformedData.length > 0 && (
-                                    <Box sx={{display: 'flex', gap: 1, ml: 'auto'}}>
-                                        <Typography variant="body2" sx={{mr: 1, alignSelf: 'center'}}>
+                                    <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
+                                        <Typography variant="body2" sx={{ mr: 1, alignSelf: 'center' }}>
                                             Download as:
                                         </Typography>
                                         <Button
@@ -435,9 +514,9 @@ export default function Home() {
                                             onClick={() => handleDownload('csv')}
                                             title="Download as CSV file"
                                             size="small"
-                                            endIcon={<TableViewIcon/>}
-                                            disabled={isLoading}
-                                            sx={{minWidth: '100px', width: '100px'}}
+                                            endIcon={<TableViewIcon />}
+                                            disabled={isLoading || isTransformingFullData}
+                                            sx={{ minWidth: '100px', width: '100px' }}
                                         >
                                             CSV
                                         </Button>
@@ -446,9 +525,9 @@ export default function Home() {
                                             onClick={() => handleDownload('tsv')}
                                             title="Download as TSV file"
                                             size="small"
-                                            endIcon={<GridOnIcon/>}
-                                            disabled={isLoading}
-                                            sx={{minWidth: '100px', width: '100px'}}
+                                            endIcon={<GridOnIcon />}
+                                            disabled={isLoading || isTransformingFullData}
+                                            sx={{ minWidth: '100px', width: '100px' }}
                                         >
                                             TSV
                                         </Button>
@@ -457,9 +536,9 @@ export default function Home() {
                                             onClick={() => handleDownload('json')}
                                             title="Download as JSON file"
                                             size="small"
-                                            endIcon={<CodeIcon/>}
-                                            disabled={isLoading}
-                                            sx={{minWidth: '100px', width: '100px'}}
+                                            endIcon={<CodeIcon />}
+                                            disabled={isLoading || isTransformingFullData}
+                                            sx={{ minWidth: '100px', width: '100px' }}
                                         >
                                             JSON
                                         </Button>
@@ -468,9 +547,9 @@ export default function Home() {
                                             onClick={() => handleDownload('excel')}
                                             title="Download as Excel file"
                                             size="small"
-                                            endIcon={<InsertDriveFileIcon/>}
-                                            disabled={isLoading}
-                                            sx={{minWidth: '100px', width: '100px'}}
+                                            endIcon={<InsertDriveFileIcon />}
+                                            disabled={isLoading || isTransformingFullData}
+                                            sx={{ minWidth: '100px', width: '100px' }}
                                         >
                                             Excel
                                         </Button>
@@ -478,19 +557,20 @@ export default function Home() {
                                 )}
                             </Box>
 
-                            {isLoading && (
-                                <Box sx={{display: 'flex', justifyContent: 'center', my: 4}}>
-                                    <CircularProgress/>
+                            {/* Display loading indicator for non-transformation operations */}
+                            {isLoading && !isTransformingFullData && (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+                                    <CircularProgress />
                                 </Box>
                             )}
 
                             {fileData && !isLoading && (
-                                <Box sx={{width: '100%'}}>
-                                    <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
+                                <Box sx={{ width: '100%' }}>
+                                    <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                                         <Tabs value={tabValue} onChange={handleTabChange}
                                               aria-label="data preview tabs">
-                                            <Tab label="Original Data"/>
-                                            {transformedData.length > 0 && <Tab label="Transformed Data"/>}
+                                            <Tab label="Original Data" />
+                                            {transformedData.length > 0 && <Tab label="Transformed Data" />}
                                         </Tabs>
                                     </Box>
                                     <TabPanel value={tabValue} index={0}>
@@ -514,7 +594,18 @@ export default function Home() {
                     )}
                 </Paper>
             </Container>
-            <Footer/>
+            <Footer />
+
+            {/* Transformation progress modal */}
+            <TransformationProgressModal
+                isOpen={isTransformingFullData}
+                progress={transformProgress}
+                stage={transformationStage}
+                indeterminate={showIndeterminateProgress}
+                totalRows={fileData?.data.length || 0}
+                onCancel={handleCancelTransformation}
+                isCancelling={isCancelling}
+            />
         </Box>
     );
 }
