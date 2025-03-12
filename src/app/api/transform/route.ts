@@ -91,7 +91,7 @@ Transform ALL rows according to the instructions. Return the transformed data as
 
         // Process data in batches to avoid token limits
         const batchSize = 30;
-        const transformedResults = [];
+        const batchPromises = [];
 
         for (let i = 0; i < dataJson.length; i += batchSize) {
             const batch = dataJson.slice(i, Math.min(i + batchSize, dataJson.length));
@@ -104,23 +104,56 @@ Transform ALL rows according to the instructions. Return the transformed data as
                     {role: 'user', content: `Transform these rows:\n${JSON.stringify(batch, null, 2)}`}
                 ],
                 temperature: 0, // Use zero temperature for deterministic results
-                response_format: {type: "json_object"}
+                max_tokens: 16384,
+                response_format: { type: "json_object" }
             };
 
-            logger.debug('Sending OpenAI request', requestPayload);
-            const response = await openai.chat.completions.create(requestPayload);
-            logger.debug('Received OpenAI response', response.choices[0]);
+            logger.debug(`Sending batch starting at index ${i}; size: ${batch.length}`);
 
-            // Extract the function arguments which contain our JSON data
-            try {
-                const content = response.choices[0].message.content?.trim() || '{}';
-                const jsonResponse = JSON.parse(content);
-                const transformedData = jsonResponse.data || [];
-                transformedResults.push(...transformedData);
-            } catch (error) {
-                throw new Error(`Failed to parse OpenAI JSON response: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            }
+            batchPromises.push(
+                (async () => {
+                    let attempt = 0;
+                    const maxRetries = 3;
+
+                    while (attempt < maxRetries) {
+                        try {
+                            const response = await openai.chat.completions.create(requestPayload);
+                            const content = response.choices[0].message.content?.trim() || '{}';
+                            const jsonResponse = JSON.parse(content);
+
+                            logger.debug(`Received batch starting at index ${i}; size: ${jsonResponse.data.length}`);
+                            logger.debug(`Usage: ${JSON.stringify(response.usage)}`);
+
+                            if (jsonResponse.data.length !== batch.length) {
+                                logger.warn(`WARNING: Attempt ${attempt + 1}: Expected ${batch.length} rows but received ${jsonResponse.data.length}. Retrying...`);
+                            } else {
+                                return jsonResponse.data || [];
+                            }
+
+                            logger.debug(`Batch: ${JSON.stringify(batch, null, 2)}`);
+                            logger.debug(`Response.data: ${JSON.stringify(jsonResponse.data, null, 2)}`);
+
+                        } catch (error) {
+                            logger.error(`Batch ${i} failed on attempt ${attempt + 1}: ${error}`);
+                        }
+
+                        attempt++;
+                    }
+
+                    logger.error(`Batch ${i} failed after ${maxRetries} retries.`);
+
+                    throw new Error(`Batch ${i} failed after ${maxRetries} retries.`);
+                })()
+            );
+
         }
+
+        // Promise.all preserves the order of batches as created above
+        const batchResults = await Promise.all(batchPromises);
+
+        // Flatten the results into a single array; rows remain in order.
+        const transformedResults = batchResults.flat();
+        logger.debug(`Transformed results: ${transformedResults.length}`);
 
         // If the requested output is JSON, return the JSON objects directly
         if (outputFormat === 'json') {
