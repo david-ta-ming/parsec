@@ -5,6 +5,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import theme from '@/theme/theme';
 import {Roboto} from "next/font/google";
 import "./globals.css";
+import { GoogleAnalytics } from '@next/third-parties/google'
 
 // Set up the font
 const roboto = Roboto({
@@ -96,6 +97,7 @@ export default function RootLayout({
             {/* Add structured data for rich search results */}
             <StructuredData/>
         </head>
+        <GoogleAnalytics gaId="G-6VYLKTXF1J" />
         <body className={roboto.className}>
         <AppRouterCacheProvider>
             <ThemeProvider theme={theme}>
