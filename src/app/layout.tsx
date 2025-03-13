@@ -14,6 +14,9 @@ const roboto = Roboto({
     display: 'swap',
 });
 
+// Get the Google verification code from environment variable
+const googleVerificationCode = process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION_CODE;
+
 // Enhanced metadata for better SEO
 export const metadata: Metadata = {
     title: "Parsec - AI-Powered Data Transformation Tool",
@@ -54,9 +57,8 @@ export const metadata: Metadata = {
         follow: true,
     },
     verification: {
-        // Add your Google Search Console verification code here if you have one
-        // <meta name="google-site-verification" content="OCuEnJomWX1hNjgw-ore972oHZODjjMvgXiHzeCSmW8" />
-        google: 'OCuEnJomWX1hNjgw-ore972oHZODjjMvgXiHzeCSmW8',
+        // Use the Google verification code from environment variable if available
+        ...(googleVerificationCode && { google: googleVerificationCode }),
     },
 
 };
@@ -93,6 +95,10 @@ export default function RootLayout({
                                    }: Readonly<{
     children: React.ReactNode;
 }>) {
+
+    // Get Google Analytics ID from environment variable
+    const googleAnalyticsId = process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID;
+
     return (
         <html lang="en">
         <head>
@@ -103,7 +109,8 @@ export default function RootLayout({
             {/* Add structured data for rich search results */}
             <StructuredData/>
         </head>
-        <GoogleAnalytics gaId="G-6VYLKTXF1J" />
+        {/* Only include Google Analytics when ID is provided */}
+        {googleAnalyticsId && <GoogleAnalytics gaId={googleAnalyticsId} />}
         <body className={roboto.className}>
         <AppRouterCacheProvider>
             <ThemeProvider theme={theme}>
