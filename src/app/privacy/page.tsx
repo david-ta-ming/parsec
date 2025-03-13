@@ -5,6 +5,9 @@ import Link from 'next/link';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 export default function PrivacyPolicy() {
+    // Get support email from environment variable
+    const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
+
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
             <Header />
@@ -104,14 +107,18 @@ export default function PrivacyPolicy() {
                         We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page. Changes are effective when posted.
                     </Typography>
 
-                    <Typography variant="h5" component="h2" sx={{ mt: 4, mb: 2 }}>
-                        Contact Us
-                    </Typography>
-                    <Typography variant="body1" paragraph>
-                        If you have any questions about this Privacy Policy, please contact us at:
-                        <br />
-                        Email: <Link href="mailto:privacy@parsecdata.com">privacy@parsecdata.com</Link>
-                    </Typography>
+                    {supportEmail && (
+                        <>
+                            <Typography variant="h5" component="h2" sx={{ mt: 4, mb: 2 }}>
+                                Contact Us
+                            </Typography>
+                            <Typography variant="body1" paragraph>
+                                If you have any questions about this Privacy Policy, please contact us at:
+                                <br />
+                                Email: <Link href={`mailto:${supportEmail}`}>{supportEmail}</Link>
+                            </Typography>
+                        </>
+                    )}
                 </Paper>
             </Container>
             <Footer />

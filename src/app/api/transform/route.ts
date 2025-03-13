@@ -99,12 +99,6 @@ async function processBatch(batch: Record<string, string>[], systemPrompt: strin
                 continue;
             }
 
-            if (jsonResponse.data.length !== batch.length) {
-                logger.warn(`Attempt ${attempt + 1}: Expected ${batch.length} rows but received ${jsonResponse.data.length}. Retrying...`);
-                attempt++;
-                continue;
-            }
-
             return jsonResponse.data;
         } catch (error) {
             logger.error(`Batch ${batchIndex} failed on attempt ${attempt + 1}: ${error}`);
@@ -182,7 +176,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Validate JSON format
-        const dataIsJson = data.length > 0 && typeof data[0] === 'object' && !Array.isArray(data[0]);
+        const dataIsJson = typeof data[0] === 'object' && !Array.isArray(data[0]);
         if (!dataIsJson) {
             return NextResponse.json(
                 { error: 'Invalid JSON data' },

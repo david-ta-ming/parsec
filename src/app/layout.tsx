@@ -53,6 +53,12 @@ export const metadata: Metadata = {
         index: true,
         follow: true,
     },
+    verification: {
+        // Add your Google Search Console verification code here if you have one
+        // <meta name="google-site-verification" content="OCuEnJomWX1hNjgw-ore972oHZODjjMvgXiHzeCSmW8" />
+        google: 'OCuEnJomWX1hNjgw-ore972oHZODjjMvgXiHzeCSmW8',
+    },
+
 };
 
 // Structured data for rich search results
