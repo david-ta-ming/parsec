@@ -28,6 +28,18 @@ frontend:
           else
             echo "✅ NEXT_PUBLIC_SUPPORT_EMAIL is set to $NEXT_PUBLIC_SUPPORT_EMAIL"
           fi
+        - |
+          if [ -z "$NEXT_PUBLIC_GOOGLE_VERIFICATION_CODE" ]; then
+            echo "WARNING: NEXT_PUBLIC_GOOGLE_VERIFICATION_CODE environment variable is not set, Google verification will be disabled"
+          else
+            echo "✅ NEXT_PUBLIC_GOOGLE_VERIFICATION_CODE is set"
+          fi
+        - |
+          if [ -z "$NEXT_PUBLIC_GOOGLE_ANALYTICS_ID" ]; then
+            echo "INFO: NEXT_PUBLIC_GOOGLE_ANALYTICS_ID environment variable is not set, Google Analytics will be disabled"
+          else
+            echo "✅ NEXT_PUBLIC_GOOGLE_ANALYTICS_ID is set to $NEXT_PUBLIC_GOOGLE_ANALYTICS_ID"
+          fi
         - yarn install
     build:
       commands:
