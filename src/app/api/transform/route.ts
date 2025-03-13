@@ -5,7 +5,7 @@ import logger from '@/utils/logger';
 // Configuration constants
 const CONFIG = {
     MAX_RETRY_ATTEMPTS: 3,
-    BATCH_SIZE: 5,
+    BATCH_SIZE: 3,
     MODEL: process.env.OPENAI_MODEL || 'gpt-4o-mini',
     API_KEY: process.env.OPENAI_API_KEY || ''
 };
