@@ -17,9 +17,6 @@ export default function Footer() {
                         <Link href="/privacy" color="inherit" underline="hover" variant="body2">
                             Privacy
                         </Link>
-                        <Link href="/terms" color="inherit" underline="hover" variant="body2">
-                            Terms
-                        </Link>
                         <Link
                             href="https://github.com/david-ta-ming/parsec"
                             color="inherit"
