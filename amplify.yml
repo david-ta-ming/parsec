@@ -53,3 +53,7 @@ frontend:
     paths:
       - .next/cache/**/*
       - node_modules/**/*
+amplifyConfiguration:
+  api:
+    function:
+      defaultTimeoutInSeconds: 300
