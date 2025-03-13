@@ -36,7 +36,7 @@ import {
 import Papa from "papaparse";
 
 // Process data in batches to avoid timeout
-const BATCH_SIZE: number = 100;
+const BATCH_SIZE: number = 30;
 
 // Interface for the tabs
 interface TabPanelProps {
