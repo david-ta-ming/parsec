@@ -96,6 +96,13 @@ const fetchWithRetry = async (
             // For other error status codes, don't retry
             return response;
         } catch (error) {
+
+            // Check if this is an AbortError (user cancelled)
+            if (error instanceof Error && error.name === 'AbortError') {
+                // Don't retry aborted requests, just propagate the abort
+                throw error;
+            }
+
             // For network errors, retry
             retries++;
             console.warn(`Network error: ${error instanceof Error ? error.message : String(error)}. Retry ${retries}/${MAX_RETRIES}`);
