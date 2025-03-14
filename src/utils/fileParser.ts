@@ -29,6 +29,8 @@ export const parseFile = async (file: File, options?: ParseOptions): Promise<Fil
         case 'xlsx':
         case 'xls':
             return parseExcel(file, hasHeaders);
+        case 'json':
+            return parseJson(file, hasHeaders);
         default:
             throw new Error(`Unsupported file type: .${fileExtension}`);
     }
@@ -134,6 +136,91 @@ const parseExcel = async (file: File, hasHeaders: boolean): Promise<FileData> =>
 
         reader.readAsArrayBuffer(file);
     });
+};
+
+const parseJson = async (file: File, hasHeaders: boolean): Promise<FileData> => {
+    try {
+        const text = await file.text();
+        const jsonData = JSON.parse(text);
+
+        // Check if the JSON is an array
+        if (!Array.isArray(jsonData)) {
+            throw new Error('JSON file must contain an array of objects');
+        }
+
+        if (jsonData.length === 0) {
+            return { headers: [], data: [], hasHeaders };
+        }
+
+        // Check if array elements are objects (typical JSON data format)
+        if (typeof jsonData[0] === 'object' && jsonData[0] !== null && !Array.isArray(jsonData[0])) {
+            // Array of objects - typical JSON data format
+
+            // Get all possible keys from all objects to ensure we capture all possible headers
+            const allKeys = new Set<string>();
+            jsonData.forEach((item) => {
+                if (item && typeof item === 'object') {
+                    Object.keys(item).forEach((key) => allKeys.add(key));
+                }
+            });
+
+            const headers = Array.from(allKeys);
+
+            // Convert objects to arrays of values in header order
+            const data = jsonData.map((row) => {
+                if (!row || typeof row !== 'object') {
+                    // Handle non-object entries by filling with empty strings
+                    return headers.map(() => '');
+                }
+
+                return headers.map((key) => {
+                    const value = (row as Record<string, unknown>)[key];
+                    // Convert complex objects/arrays to JSON strings
+                    if (value && typeof value === 'object') {
+                        return JSON.stringify(value);
+                    }
+                    return value?.toString() || '';
+                });
+            });
+
+            return { headers, data, hasHeaders: true }; // JSON objects always have implicit headers
+        } else {
+            // Handle array of arrays (less common for JSON but possible)
+            // Assume first row as headers if hasHeaders is true
+            let headers: string[] = [];
+            let data: string[][];
+
+            // Convert all values to strings
+            const stringData = jsonData.map((row: unknown) => {
+                if (Array.isArray(row)) {
+                    return row.map((cell) => {
+                        if (cell && typeof cell === 'object') {
+                            return JSON.stringify(cell);
+                        }
+                        return cell?.toString() || '';
+                    });
+                }
+                // Handle non-array row (convert single value to array)
+                return [row?.toString() || ''];
+            });
+
+            if (hasHeaders && stringData.length > 0) {
+                headers = stringData[0];
+                data = stringData.slice(1);
+            } else {
+                data = stringData;
+                // Generate default column headers
+                if (data.length > 0) {
+                    const columnCount = data[0].length;
+                    headers = Array.from({ length: columnCount }, (_, i) => `Column ${i + 1}`);
+                }
+            }
+
+            return { headers, data, hasHeaders };
+        }
+    } catch (error) {
+        throw new Error(`Failed to parse JSON file: ${error instanceof Error ? error.message : String(error)}`);
+    }
 };
 
 /**

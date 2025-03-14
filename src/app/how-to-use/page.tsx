@@ -52,11 +52,13 @@ export default function HowToUse() {
                                         <Typography component="li" variant="body1">CSV files</Typography>
                                         <Typography component="li" variant="body1">TSV (Tab-separated) files</Typography>
                                         <Typography component="li" variant="body1">TXT files with delimited data</Typography>
+                                        <Typography component="li" variant="body1">JSON files (arrays of objects or arrays)</Typography>
                                         <Typography component="li" variant="body1">Excel files (.xlsx, .xls)</Typography>
                                     </Box>
                                     <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
                                         If your file has headers in the first row, make sure the "File has headers" toggle is turned on.
-                                        If not, turn it off, and Parsec will automatically generate column names.
+                                        If not, turn it off, and Parsec will automatically generate column names. For JSON files with objects,
+                                        headers are automatically extracted from object keys.
                                     </Typography>
                                 </CardContent>
                             </Card>
@@ -152,6 +154,7 @@ export default function HowToUse() {
                             <Typography component="li" variant="body1">Calculations between columns (price * quantity)</Typography>
                             <Typography component="li" variant="body1">Text extraction (domain from email, first name from full name)</Typography>
                             <Typography component="li" variant="body1">Data cleaning (removing special characters, fixing typos)</Typography>
+                            <Typography component="li" variant="body1">JSON structure simplification and normalization</Typography>
                         </Box>
                     </Box>
 

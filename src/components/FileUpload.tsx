@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
     Box,
-    Button,
     Typography,
     styled,
     FormControlLabel,
@@ -45,7 +44,23 @@ export default function FileUpload({ onFileUpload }: FileUploadProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [hasHeaders, setHasHeaders] = useState(true);
+    const [isJsonFile, setIsJsonFile] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Update isJsonFile when selectedFile changes
+    useEffect(() => {
+        if (selectedFile) {
+            const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase();
+            setIsJsonFile(fileExtension === 'json');
+
+            // If it's a JSON file, always set hasHeaders to true
+            if (fileExtension === 'json') {
+                setHasHeaders(true);
+            }
+        } else {
+            setIsJsonFile(false);
+        }
+    }, [selectedFile]);
 
     const handleDragEnter = (e: React.DragEvent) => {
         e.preventDefault();
@@ -84,7 +99,14 @@ export default function FileUpload({ onFileUpload }: FileUploadProps) {
 
     const handleFile = (file: File) => {
         setSelectedFile(file);
-        onFileUpload(file, hasHeaders);
+
+        // Check if it's a JSON file and set hasHeaders to true if it is
+        const fileExtension = file.name.split('.').pop()?.toLowerCase();
+        if (fileExtension === 'json') {
+            setHasHeaders(true);
+        }
+
+        onFileUpload(file, fileExtension === 'json' ? true : hasHeaders);
     };
 
     const handleUploadClick = () => {
@@ -103,7 +125,7 @@ export default function FileUpload({ onFileUpload }: FileUploadProps) {
         }
     };
 
-    const acceptedFileTypes = '.csv,.tsv,.txt,.xlsx,.xls';
+    const acceptedFileTypes = '.csv,.tsv,.txt,.xlsx,.xls,.json';
 
     return (
         <Box>
@@ -126,7 +148,7 @@ export default function FileUpload({ onFileUpload }: FileUploadProps) {
                     }
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                    Supports CSV, TSV, TXT, and Excel files
+                    Supports CSV, TSV, TXT, JSON, and Excel files
                 </Typography>
                 <VisuallyHiddenInput
                     type="file"
@@ -143,11 +165,16 @@ export default function FileUpload({ onFileUpload }: FileUploadProps) {
                             checked={hasHeaders}
                             onChange={handleHeaderToggleChange}
                             color="primary"
+                            disabled={isJsonFile}
                         />
                     }
                     label="File has headers"
                 />
-                <Tooltip title="Turn off if your file does not have column headers in the first row" arrow>
+                <Tooltip title={isJsonFile
+                    ? "JSON files with objects automatically use keys as headers"
+                    : "Turn off if your file does not have column headers in the first row. For JSON files with objects, headers are automatically extracted."}
+                         arrow
+                >
                     <HelpOutlineIcon color="action" fontSize="small" sx={{ ml: 1 }} />
                 </Tooltip>
             </Box>

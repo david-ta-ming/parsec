@@ -7,7 +7,7 @@ Parsec is an intuitive data transformation tool that uses AI to process data bas
 ## 🚀 Key Features
 
 - **Natural Language Processing**: Transform your data by describing what you want in plain English
-- **Multiple File Formats**: Support for CSV, TSV, TXT, and Excel files
+- **Multiple File Formats**: Support for CSV, TSV, TXT, JSON, and Excel files
 - **Privacy-First Approach**: Your data is never stored permanently - it's only processed temporarily
 - **Interactive Preview**: See a sample of your transformed data before processing the entire file
 - **Multiple Export Options**: Download your transformed data as CSV, TSV, JSON, or Excel
@@ -64,7 +64,7 @@ Parsec is an intuitive data transformation tool that uses AI to process data bas
 
 - Click on the upload area or drag and drop your file
 - Toggle "File has headers" based on your file structure
-- Supported formats: CSV, TSV, TXT, Excel (.xlsx, .xls)
+- Supported formats: CSV, TSV, TXT, JSON, Excel (.xlsx, .xls)
 
 ### 2. Describe Your Transformation
 
