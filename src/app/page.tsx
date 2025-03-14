@@ -76,8 +76,6 @@ export default function Home() {
     const [isTransformingFullData, setIsTransformingFullData] = useState<boolean>(false);
     const [transformedData, setTransformedData] = useState<Record<string, string>[]>([]);
     const [transformProgress, setTransformProgress] = useState<number>(0);
-    const [transformationStage, setTransformationStage] = useState<string>('');
-    const [showIndeterminateProgress, setShowIndeterminateProgress] = useState<boolean>(false);
     const [isCancelling, setIsCancelling] = useState<boolean>(false);
     const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -117,8 +115,6 @@ export default function Home() {
         setTimeout(() => {
             setIsTransformingFullData(false);
             setTransformProgress(0);
-            setTransformationStage('');
-            setShowIndeterminateProgress(false);
             setIsCancelling(false);
             setError(null);
         }, 500);
@@ -172,7 +168,6 @@ export default function Home() {
         }
     };
 
-    // Update the transformAllData function with progress tracking and cancellation
     const transformAllData = async (): Promise<Record<string, string>[]> => {
         if (!fileData || !transformationPrompt.trim()) {
             setError('Please upload a file and provide transformation instructions');
@@ -187,8 +182,6 @@ export default function Home() {
             // Set initial states
             setIsTransformingFullData(true);
             setTransformProgress(0);
-            setTransformationStage('Initializing transformation...');
-            setShowIndeterminateProgress(true);
             setError(null);
 
             let allTransformedRows: Record<string, string>[] = [];
@@ -206,14 +199,8 @@ export default function Home() {
                 const batch = fileData.data.slice(i, i + BATCH_SIZE);
                 const currentBatch = Math.floor(i / BATCH_SIZE) + 1;
 
-                // Update the stage message before each batch
-                setTransformationStage(`Preparing batch ${currentBatch} of ${totalBatches}...`);
-
                 // Convert batch to JSON objects
                 const batchObjects = convertArrayToJsonObjects(batch, fileData.headers);
-
-                // Update the stage message before API call
-                setTransformationStage(`Processing batch ${currentBatch} of ${totalBatches}...`);
 
                 const response = await fetch('/api/transform', {
                     method: 'POST',
@@ -236,22 +223,12 @@ export default function Home() {
 
                 const result = await response.json();
 
-                // Switch to determinate progress after first batch completes
-                if (i === 0) {
-                    setShowIndeterminateProgress(false);
-                }
-
                 allTransformedRows = [...allTransformedRows, ...result.transformedData];
 
                 // Update progress
                 const progressPercentage = Math.round((currentBatch / totalBatches) * 100);
                 setTransformProgress(progressPercentage);
-                setTransformationStage(`Transformed ${currentBatch * BATCH_SIZE > fileData.data.length ?
-                    fileData.data.length : currentBatch * BATCH_SIZE} of ${fileData.data.length} rows (${progressPercentage}%)...`);
             }
-
-            // Final stage message
-            setTransformationStage('Finalizing results...');
 
             // Add a small delay to show the 100% state before completion
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -273,8 +250,6 @@ export default function Home() {
             if (!isCancelling) {
                 setIsTransformingFullData(false);
                 setTransformProgress(0);
-                setTransformationStage('');
-                setShowIndeterminateProgress(false);
             }
             abortControllerRef.current = null;
         }
@@ -600,8 +575,6 @@ export default function Home() {
             <TransformationProgressModal
                 isOpen={isTransformingFullData}
                 progress={transformProgress}
-                stage={transformationStage}
-                indeterminate={showIndeterminateProgress}
                 totalRows={fileData?.data.length || 0}
                 onCancel={handleCancelTransformation}
                 isCancelling={isCancelling}
