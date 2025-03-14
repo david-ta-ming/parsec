@@ -37,6 +37,7 @@ import Papa from "papaparse";
 
 // Process data in batches to avoid timeout
 const BATCH_SIZE: number = 15;
+const MAX_RETRIES: number = 3;
 
 // Interface for the tabs
 interface TabPanelProps {
@@ -64,6 +65,54 @@ function TabPanel(props: TabPanelProps) {
         </div>
     );
 }
+
+// Utility function for API requests with retry logic
+const fetchWithRetry = async (
+    url: string,
+    options: RequestInit,
+    retryDelay: number = 1000
+): Promise<Response> => {
+    let retries = 0;
+
+    while (retries < MAX_RETRIES) {
+        try {
+            const response = await fetch(url, options);
+
+            // If the request was successful, return the response
+            if (response.ok) {
+                return response;
+            }
+
+            // If we got a 429 (Too Many Requests), 504 (Gateway Timeout), or other 5xx error, retry
+            if (response.status === 429 || response.status === 504 || response.status >= 500) {
+                retries++;
+                console.warn(`Request failed with status ${response.status}. Retry ${retries}/${MAX_RETRIES}`);
+
+                // Wait before retrying (with exponential backoff)
+                await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, retries - 1)));
+                continue;
+            }
+
+            // For other error status codes, don't retry
+            return response;
+        } catch (error) {
+            // For network errors, retry
+            retries++;
+            console.warn(`Network error: ${error instanceof Error ? error.message : String(error)}. Retry ${retries}/${MAX_RETRIES}`);
+
+            // If we've reached the max retries, throw the error
+            if (retries >= MAX_RETRIES) {
+                throw error;
+            }
+
+            // Wait before retrying (with exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, retries - 1)));
+        }
+    }
+
+    // This should not be reached, but TypeScript requires a return statement
+    throw new Error('Maximum retries reached');
+};
 
 export default function Home() {
     const [fileData, setFileData] = useState<FileData | null>(null);
@@ -122,7 +171,7 @@ export default function Home() {
         }, 500);
     };
 
-    const handleTransform = async () => {
+    const handlePreviewTransform = async () => {
         if (!fileData || !transformationPrompt.trim()) {
             setError('Please upload a file and provide transformation instructions');
             return;
@@ -138,19 +187,23 @@ export default function Home() {
             // Convert sample data to JSON objects before sending to API
             const sampleObjects = convertArrayToJsonObjects(sample, fileData.headers);
 
-            const response = await fetch('/api/transform', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    data: sampleObjects,
-                    headers: fileData.headers,
-                    transformationPrompt,
-                    hasHeaders: fileData.hasHeaders,
-                    outputFormat: 'json' // Always request JSON from the API
-                }),
-            });
+            // Use the fetchWithRetry function instead of fetch
+            const response = await fetchWithRetry(
+                '/api/transform',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        data: sampleObjects,
+                        headers: fileData.headers,
+                        transformationPrompt,
+                        hasHeaders: fileData.hasHeaders,
+                        outputFormat: 'json' // Always request JSON from the API
+                    }),
+                }
+            );
 
             if (!response.ok) {
                 throw new Error(`API error: ${response.statusText}`);
@@ -210,20 +263,24 @@ export default function Home() {
                 const rowsProcessed = Math.min((i + BATCH_SIZE), fileData.data.length);
                 setProcessedRows(rowsProcessed);
 
-                const response = await fetch('/api/transform', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        data: batchObjects,
-                        headers: fileData.headers,
-                        transformationPrompt,
-                        hasHeaders: fileData.hasHeaders,
-                        outputFormat: 'json' // Always request JSON from the API
-                    }),
-                    signal, // Pass the abort signal to fetch
-                });
+                // Use the fetchWithRetry function with the abort signal
+                const response = await fetchWithRetry(
+                    '/api/transform',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            data: batchObjects,
+                            headers: fileData.headers,
+                            transformationPrompt,
+                            hasHeaders: fileData.hasHeaders,
+                            outputFormat: 'json' // Always request JSON from the API
+                        }),
+                        signal, // Pass the abort signal to fetch
+                    }
+                );
 
                 if (!response.ok) {
                     throw new Error(`API error: ${response.statusText}`);
@@ -236,8 +293,6 @@ export default function Home() {
                 // Update progress and processed rows
                 const progressPercentage = Math.round((currentBatch / totalBatches) * 100);
                 setTransformProgress(progressPercentage);
-
-
             }
 
             // Add a small delay to show the 100% state before completion
@@ -483,7 +538,7 @@ export default function Home() {
                                 {fileData && (
                                     <Button
                                         variant="contained"
-                                        onClick={handleTransform}
+                                        onClick={handlePreviewTransform}
                                         disabled={isLoading || !transformationPrompt.trim() || isTransformingFullData}
                                     >
                                         Preview Transformation
