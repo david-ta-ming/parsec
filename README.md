@@ -2,7 +2,7 @@
 
 Parsec is an intuitive data transformation tool that uses AI to process data based on natural language instructions. Simply upload your data file, describe the transformations you need in plain English, and let Parsec handle the rest.
 
-![Parsec Logo](public/favicon.svg)
+<img src="public/favicon.svg" alt="parsec-logo" width="125"/>
 
 ## 🚀 Key Features
 
