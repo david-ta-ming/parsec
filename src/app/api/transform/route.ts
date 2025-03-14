@@ -38,8 +38,9 @@ Rules:
 1. Input: JSON objects with column headers as keys
 2. Output: Same JSON format with headers as keys 
 3. Maintain column count unless instructed otherwise
-4. Return only valid JSON with a 'data' field containing transformed row objects
-5. No explanations or comments`;
+4. Don't exclude rows unless instructed
+5. Return only valid JSON with a 'data' field containing transformed row objects
+6. No explanations or comments`;
 }
 
 /**
