@@ -97,7 +97,7 @@ const TransformationProgressModal: React.FC<TransformationProgressModalProps> = 
                     {!isCancelling && (
                         <Button
                             variant="outlined"
-                            color="secondary"
+                            color="error"
                             startIcon={<CancelIcon />}
                             onClick={onCancel}
                             disabled={isCancelling}
