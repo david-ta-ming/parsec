@@ -37,6 +37,7 @@ import Papa from "papaparse";
 
 // Process data in batches to avoid timeout
 const BATCH_SIZE: number = 15;
+const MAX_RETRIES: number = 3;
 
 // Interface for the tabs
 interface TabPanelProps {
@@ -65,6 +66,54 @@ function TabPanel(props: TabPanelProps) {
     );
 }
 
+// Utility function for API requests with retry logic
+const fetchWithRetry = async (
+    url: string,
+    options: RequestInit,
+    retryDelay: number = 1000
+): Promise<Response> => {
+    let retries = 0;
+
+    while (retries < MAX_RETRIES) {
+        try {
+            const response = await fetch(url, options);
+
+            // If the request was successful, return the response
+            if (response.ok) {
+                return response;
+            }
+
+            // If we got a 429 (Too Many Requests), 504 (Gateway Timeout), or other 5xx error, retry
+            if (response.status === 429 || response.status === 504 || response.status >= 500) {
+                retries++;
+                console.warn(`Request failed with status ${response.status}. Retry ${retries}/${MAX_RETRIES}`);
+
+                // Wait before retrying (with exponential backoff)
+                await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, retries - 1)));
+                continue;
+            }
+
+            // For other error status codes, don't retry
+            return response;
+        } catch (error) {
+            // For network errors, retry
+            retries++;
+            console.warn(`Network error: ${error instanceof Error ? error.message : String(error)}. Retry ${retries}/${MAX_RETRIES}`);
+
+            // If we've reached the max retries, throw the error
+            if (retries >= MAX_RETRIES) {
+                throw error;
+            }
+
+            // Wait before retrying (with exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, retries - 1)));
+        }
+    }
+
+    // This should not be reached, but TypeScript requires a return statement
+    throw new Error('Maximum retries reached');
+};
+
 export default function Home() {
     const [fileData, setFileData] = useState<FileData | null>(null);
     const [fileName, setFileName] = useState<string>('');
@@ -76,10 +125,9 @@ export default function Home() {
     const [isTransformingFullData, setIsTransformingFullData] = useState<boolean>(false);
     const [transformedData, setTransformedData] = useState<Record<string, string>[]>([]);
     const [transformProgress, setTransformProgress] = useState<number>(0);
-    const [transformationStage, setTransformationStage] = useState<string>('');
-    const [showIndeterminateProgress, setShowIndeterminateProgress] = useState<boolean>(false);
     const [isCancelling, setIsCancelling] = useState<boolean>(false);
     const abortControllerRef = useRef<AbortController | null>(null);
+    const [processedRows, setProcessedRows] = useState<number>(0);
 
     const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
@@ -117,14 +165,13 @@ export default function Home() {
         setTimeout(() => {
             setIsTransformingFullData(false);
             setTransformProgress(0);
-            setTransformationStage('');
-            setShowIndeterminateProgress(false);
+            setProcessedRows(0);
             setIsCancelling(false);
             setError(null);
         }, 500);
     };
 
-    const handleTransform = async () => {
+    const handlePreviewTransform = async () => {
         if (!fileData || !transformationPrompt.trim()) {
             setError('Please upload a file and provide transformation instructions');
             return;
@@ -140,19 +187,23 @@ export default function Home() {
             // Convert sample data to JSON objects before sending to API
             const sampleObjects = convertArrayToJsonObjects(sample, fileData.headers);
 
-            const response = await fetch('/api/transform', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    data: sampleObjects,
-                    headers: fileData.headers,
-                    transformationPrompt,
-                    hasHeaders: fileData.hasHeaders,
-                    outputFormat: 'json' // Always request JSON from the API
-                }),
-            });
+            // Use the fetchWithRetry function instead of fetch
+            const response = await fetchWithRetry(
+                '/api/transform',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        data: sampleObjects,
+                        headers: fileData.headers,
+                        transformationPrompt,
+                        hasHeaders: fileData.hasHeaders,
+                        outputFormat: 'json' // Always request JSON from the API
+                    }),
+                }
+            );
 
             if (!response.ok) {
                 throw new Error(`API error: ${response.statusText}`);
@@ -172,7 +223,6 @@ export default function Home() {
         }
     };
 
-    // Update the transformAllData function with progress tracking and cancellation
     const transformAllData = async (): Promise<Record<string, string>[]> => {
         if (!fileData || !transformationPrompt.trim()) {
             setError('Please upload a file and provide transformation instructions');
@@ -187,8 +237,7 @@ export default function Home() {
             // Set initial states
             setIsTransformingFullData(true);
             setTransformProgress(0);
-            setTransformationStage('Initializing transformation...');
-            setShowIndeterminateProgress(true);
+            setProcessedRows(0);
             setError(null);
 
             let allTransformedRows: Record<string, string>[] = [];
@@ -206,29 +255,32 @@ export default function Home() {
                 const batch = fileData.data.slice(i, i + BATCH_SIZE);
                 const currentBatch = Math.floor(i / BATCH_SIZE) + 1;
 
-                // Update the stage message before each batch
-                setTransformationStage(`Preparing batch ${currentBatch} of ${totalBatches}...`);
-
                 // Convert batch to JSON objects
                 const batchObjects = convertArrayToJsonObjects(batch, fileData.headers);
 
-                // Update the stage message before API call
-                setTransformationStage(`Processing batch ${currentBatch} of ${totalBatches}...`);
+                // Calculate the number of rows processed so far
+                // Use Math.min to ensure we don't show more than the total number of rows
+                const rowsProcessed = Math.min((i + BATCH_SIZE), fileData.data.length);
+                setProcessedRows(rowsProcessed);
 
-                const response = await fetch('/api/transform', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        data: batchObjects,
-                        headers: fileData.headers,
-                        transformationPrompt,
-                        hasHeaders: fileData.hasHeaders,
-                        outputFormat: 'json' // Always request JSON from the API
-                    }),
-                    signal, // Pass the abort signal to fetch
-                });
+                // Use the fetchWithRetry function with the abort signal
+                const response = await fetchWithRetry(
+                    '/api/transform',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            data: batchObjects,
+                            headers: fileData.headers,
+                            transformationPrompt,
+                            hasHeaders: fileData.hasHeaders,
+                            outputFormat: 'json' // Always request JSON from the API
+                        }),
+                        signal, // Pass the abort signal to fetch
+                    }
+                );
 
                 if (!response.ok) {
                     throw new Error(`API error: ${response.statusText}`);
@@ -236,22 +288,12 @@ export default function Home() {
 
                 const result = await response.json();
 
-                // Switch to determinate progress after first batch completes
-                if (i === 0) {
-                    setShowIndeterminateProgress(false);
-                }
-
                 allTransformedRows = [...allTransformedRows, ...result.transformedData];
 
-                // Update progress
+                // Update progress and processed rows
                 const progressPercentage = Math.round((currentBatch / totalBatches) * 100);
                 setTransformProgress(progressPercentage);
-                setTransformationStage(`Transformed ${currentBatch * BATCH_SIZE > fileData.data.length ?
-                    fileData.data.length : currentBatch * BATCH_SIZE} of ${fileData.data.length} rows (${progressPercentage}%)...`);
             }
-
-            // Final stage message
-            setTransformationStage('Finalizing results...');
 
             // Add a small delay to show the 100% state before completion
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -273,8 +315,7 @@ export default function Home() {
             if (!isCancelling) {
                 setIsTransformingFullData(false);
                 setTransformProgress(0);
-                setTransformationStage('');
-                setShowIndeterminateProgress(false);
+                setProcessedRows(0);
             }
             abortControllerRef.current = null;
         }
@@ -497,7 +538,7 @@ export default function Home() {
                                 {fileData && (
                                     <Button
                                         variant="contained"
-                                        onClick={handleTransform}
+                                        onClick={handlePreviewTransform}
                                         disabled={isLoading || !transformationPrompt.trim() || isTransformingFullData}
                                     >
                                         Preview Transformation
@@ -600,8 +641,7 @@ export default function Home() {
             <TransformationProgressModal
                 isOpen={isTransformingFullData}
                 progress={transformProgress}
-                stage={transformationStage}
-                indeterminate={showIndeterminateProgress}
+                processedRows={processedRows}
                 totalRows={fileData?.data.length || 0}
                 onCancel={handleCancelTransformation}
                 isCancelling={isCancelling}

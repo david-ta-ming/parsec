@@ -5,7 +5,7 @@ import logger from '@/utils/logger';
 // Configuration constants
 const CONFIG = {
     MAX_RETRY_ATTEMPTS: 3,
-    BATCH_SIZE: 3,
+    TRANSFORM_CHUNK_SIZE: 5,
     MODEL: process.env.OPENAI_MODEL || 'gpt-4o-mini',
     API_KEY: process.env.OPENAI_API_KEY || ''
 };
@@ -33,40 +33,29 @@ interface TransformResponse {
  * Builds the system prompt for OpenAI
  */
 function buildSystemPrompt(transformationPrompt: string): string {
-    return `You are a data transformation assistant. Your task is to transform each row of data according to these instructions: "${transformationPrompt}".
-Follow these strict rules:
-1. Transform the data as per the user's instructions.
-2. The input data will be provided as JSON objects where each object represents a row with column headers as keys.
-3. Return the transformed data in the same JSON format with column headers as keys.
-4. Maintain the same number of columns for each row unless explicitly instructed to add or remove columns.
-5. DO NOT add any explanations or comments in your response.
-6. Your response must be a valid JSON object with a 'data' field containing an array of transformed row objects.`;
+    return `Transform each row of data according to: "${transformationPrompt}".
+Rules:
+1. Input: JSON objects with column headers as keys
+2. Output: Same JSON format with headers as keys 
+3. Maintain column count unless instructed otherwise
+4. Don't exclude rows unless instructed
+5. Return only valid JSON with a 'data' field containing transformed row objects
+6. No explanations or comments`;
 }
 
 /**
- * Builds the user prompt for OpenAI with examples
+ * Builds the user prompt for OpenAI
  */
-function buildUserPrompt(headers: string[], exampleRows: Record<string, string>[], hasHeaders: boolean): string {
-    const dataStructure = {
-        headers,
-        exampleRows,
-        hasOriginalHeaders: hasHeaders
-    };
-
-    let prompt = `Here is the data structure in JSON format:
-${JSON.stringify(dataStructure, null, 2)}`;
-
-    if (!hasHeaders) {
-        prompt += `\n(Note: The headers were auto-generated because the original file had no headers.)`;
-    }
-
-    return prompt;
+function buildUserPrompt(headers: string[], hasHeaders: boolean): string {
+    return `Headers: ${JSON.stringify(headers)}
+${!hasHeaders ? '(Note: Headers were auto-generated)' : ''}
+Transform the following rows as JSON objects:`;
 }
 
 /**
- * Processes a batch of data using OpenAI
+ * Processes a chunk of data using OpenAI
  */
-async function processBatch(batch: Record<string, string>[], systemPrompt: string, userPrompt: string, batchIndex: number): Promise<Record<string, string>[]> {
+async function processChunk(chunk: Record<string, string>[], systemPrompt: string, userPrompt: string, chunkIndex: number): Promise<Record<string, string>[]> {
     let attempt = 0;
 
     while (attempt < CONFIG.MAX_RETRY_ATTEMPTS) {
@@ -75,21 +64,20 @@ async function processBatch(batch: Record<string, string>[], systemPrompt: strin
                 model: CONFIG.MODEL,
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt },
-                    { role: 'user', content: `Transform these rows:\n${JSON.stringify(batch, null, 2)}` }
+                    { role: 'user', content: userPrompt + `\n${JSON.stringify(chunk, null, 2)}` }
                 ],
                 temperature: 0, // Use zero temperature for deterministic results
                 max_tokens: 16384,
                 response_format: { type: "json_object" }
             };
 
-            logger.debug(`Sending batch starting at index ${batchIndex}; size: ${batch.length}`);
+            logger.debug(`Sending chunk starting at index ${chunkIndex}; size: ${chunk.length}`);
 
             const response = await openai.chat.completions.create(requestPayload);
             const content = response.choices[0].message.content?.trim() || '{}';
             const jsonResponse = JSON.parse(content);
 
-            logger.debug(`Received batch starting at index ${batchIndex}; size: ${jsonResponse.data?.length}`);
+            logger.debug(`Received chunk starting at index ${chunkIndex}; size: ${jsonResponse.data?.length}`);
             logger.debug(`Usage: ${JSON.stringify(response.usage)}`);
 
             // Validate the response
@@ -101,12 +89,12 @@ async function processBatch(batch: Record<string, string>[], systemPrompt: strin
 
             return jsonResponse.data;
         } catch (error) {
-            logger.error(`Batch ${batchIndex} failed on attempt ${attempt + 1}: ${error}`);
+            logger.error(`Chunk ${chunkIndex} failed on attempt ${attempt + 1}: ${error}`);
             attempt++;
         }
     }
 
-    throw new Error(`Batch ${batchIndex} failed after ${CONFIG.MAX_RETRY_ATTEMPTS} retries.`);
+    throw new Error(`Chunk ${chunkIndex} failed after ${CONFIG.MAX_RETRY_ATTEMPTS} retries.`);
 }
 
 /**
@@ -186,21 +174,22 @@ export async function POST(req: NextRequest) {
 
         // Build prompts
         const systemPrompt = buildSystemPrompt(transformationPrompt);
-        const exampleRows = data.slice(0, 3);
-        const userPrompt = buildUserPrompt(headers, exampleRows, hasHeaders) +
-            `\n\nInstructions: ${transformationPrompt}\n\nTransform ALL rows according to the instructions. Return the transformed data as a JSON object where each row is represented as an object with column headers as keys.`;
+        const userPrompt = buildUserPrompt(headers, hasHeaders);
 
-        // Process data in batches
-        const batchPromises: Promise<Record<string, string>[]>[] = [];
+        logger.debug(`systemPrompt: \n${systemPrompt}`);
+        logger.debug(`userPrompt: \n${userPrompt}`);
 
-        for (let i = 0; i < data.length; i += CONFIG.BATCH_SIZE) {
-            const batch = data.slice(i, Math.min(i + CONFIG.BATCH_SIZE, data.length));
-            batchPromises.push(processBatch(batch, systemPrompt, userPrompt, i));
+        // Process data in chunks
+        const chunkPromises: Promise<Record<string, string>[]>[] = [];
+
+        for (let i = 0; i < data.length; i += CONFIG.TRANSFORM_CHUNK_SIZE) {
+            const chunk = data.slice(i, Math.min(i + CONFIG.TRANSFORM_CHUNK_SIZE, data.length));
+            chunkPromises.push(processChunk(chunk, systemPrompt, userPrompt, i));
         }
 
-        // Wait for all batches to complete
-        const batchResults = await Promise.all(batchPromises);
-        const transformedResults = batchResults.flat();
+        // Wait for all chunks to complete
+        const chunkResults = await Promise.all(chunkPromises);
+        const transformedResults = chunkResults.flat();
 
         logger.debug(`Transformed results: ${transformedResults.length}`);
 

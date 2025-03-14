@@ -8,33 +8,12 @@ import {
     Fade,
     Button
 } from '@mui/material';
-import DataArrayIcon from '@mui/icons-material/DataArray';
-import SyncIcon from '@mui/icons-material/Sync';
 import CancelIcon from '@mui/icons-material/Cancel';
-
-// Define keyframe animations using Material UI's sx prop
-const spinAnimation = {
-    '@keyframes spin': {
-        '0%': { transform: 'rotate(0deg)' },
-        '100%': { transform: 'rotate(360deg)' }
-    },
-    animation: 'spin 2s linear infinite'
-};
-
-const pulseAnimation = {
-    '@keyframes pulse': {
-        '0%': { opacity: 1 },
-        '50%': { opacity: 0.7 },
-        '100%': { opacity: 1 }
-    },
-    animation: 'pulse 1.5s infinite'
-};
 
 interface TransformationProgressModalProps {
     isOpen: boolean;
     progress: number;
-    stage: string;
-    indeterminate: boolean;
+    processedRows: number;
     totalRows: number;
     onCancel: () => void;
     isCancelling: boolean;
@@ -43,8 +22,7 @@ interface TransformationProgressModalProps {
 const TransformationProgressModal: React.FC<TransformationProgressModalProps> = ({
                                                                                      isOpen,
                                                                                      progress,
-                                                                                     stage,
-                                                                                     indeterminate,
+                                                                                     processedRows,
                                                                                      totalRows,
                                                                                      onCancel,
                                                                                      isCancelling
@@ -74,7 +52,6 @@ const TransformationProgressModal: React.FC<TransformationProgressModalProps> = 
                         borderRadius: 2,
                         minWidth: 350,
                         maxWidth: '90%',
-                        maxHeight: '90%',
                         textAlign: 'center',
                         display: 'flex',
                         flexDirection: 'column',
@@ -82,32 +59,15 @@ const TransformationProgressModal: React.FC<TransformationProgressModalProps> = 
                         gap: 2
                     }}
                 >
-                    {/* Header with icon */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                        {indeterminate ? (
-                            <SyncIcon
-                                fontSize="large"
-                                color="primary"
-                                sx={spinAnimation}
-                            />
-                        ) : (
-                            <DataArrayIcon fontSize="large" color="primary" />
-                        )}
-                        <Typography variant="h5">
-                            {isCancelling ? "Cancelling..." : "Transforming Data"}
-                        </Typography>
-                    </Box>
+                    {/* Simple title */}
+                    <Typography variant="h5">
+                        {isCancelling ? "Cancelling..." : "Transforming Data"}
+                    </Typography>
 
-                    {/* Progress visualization */}
+                    {/* Progress bar */}
                     <Box sx={{ width: '100%', mt: 1 }}>
                         {isCancelling ? (
-                            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
-                                <CircularProgress size={36} thickness={4} color="secondary" />
-                            </Box>
-                        ) : indeterminate ? (
-                            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
-                                <CircularProgress size={36} thickness={4} />
-                            </Box>
+                            <CircularProgress size={36} />
                         ) : (
                             <LinearProgress
                                 variant="determinate"
@@ -116,7 +76,7 @@ const TransformationProgressModal: React.FC<TransformationProgressModalProps> = 
                             />
                         )}
 
-                        {!indeterminate && !isCancelling && (
+                        {!isCancelling && (
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
                                 <Typography variant="body2" color="text.secondary">
                                     Processed
@@ -128,41 +88,20 @@ const TransformationProgressModal: React.FC<TransformationProgressModalProps> = 
                         )}
                     </Box>
 
-                    {/* Current stage message */}
-                    <Typography
-                        variant="body1"
-                        sx={{
-                            mt: 1,
-                            color: 'text.primary',
-                            fontWeight: 'medium',
-                            ...(indeterminate || isCancelling ? pulseAnimation : {})
-                        }}
-                    >
-                        {isCancelling ? "Cancelling operation..." : stage}
+                    {/* Processing information */}
+                    <Typography variant="body2" color="text.secondary">
+                        Processing {processedRows.toLocaleString()}/{totalRows.toLocaleString()} rows of data
                     </Typography>
-
-                    {/* Additional context */}
-                    {!isCancelling && (
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                            Processing {totalRows.toLocaleString()} rows of data
-                        </Typography>
-                    )}
-
-                    {indeterminate && !isCancelling && (
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontStyle: 'italic' }}>
-                            This may take a moment for larger datasets...
-                        </Typography>
-                    )}
 
                     {/* Cancel button */}
                     {!isCancelling && (
                         <Button
                             variant="outlined"
-                            color="secondary"
+                            color="error"
                             startIcon={<CancelIcon />}
                             onClick={onCancel}
-                            sx={{ mt: 2 }}
                             disabled={isCancelling}
+                            sx={{ mt: 1 }}
                         >
                             Cancel
                         </Button>
