@@ -5,7 +5,7 @@ import logger from '@/utils/logger';
 // Configuration constants
 const CONFIG = {
     MAX_RETRY_ATTEMPTS: 3,
-    BATCH_SIZE: 5,
+    TRANSFORM_CHUNK_SIZE: 5,
     MODEL: process.env.OPENAI_MODEL || 'gpt-4o-mini',
     API_KEY: process.env.OPENAI_API_KEY || ''
 };
@@ -53,9 +53,9 @@ Transform the following rows as JSON objects:`;
 }
 
 /**
- * Processes a batch of data using OpenAI
+ * Processes a chunk of data using OpenAI
  */
-async function processBatch(batch: Record<string, string>[], systemPrompt: string, userPrompt: string, batchIndex: number): Promise<Record<string, string>[]> {
+async function processChunk(chunk: Record<string, string>[], systemPrompt: string, userPrompt: string, chunkIndex: number): Promise<Record<string, string>[]> {
     let attempt = 0;
 
     while (attempt < CONFIG.MAX_RETRY_ATTEMPTS) {
@@ -64,20 +64,20 @@ async function processBatch(batch: Record<string, string>[], systemPrompt: strin
                 model: CONFIG.MODEL,
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt + `\n${JSON.stringify(batch, null, 2)}` }
+                    { role: 'user', content: userPrompt + `\n${JSON.stringify(chunk, null, 2)}` }
                 ],
                 temperature: 0, // Use zero temperature for deterministic results
                 max_tokens: 16384,
                 response_format: { type: "json_object" }
             };
 
-            logger.debug(`Sending batch starting at index ${batchIndex}; size: ${batch.length}`);
+            logger.debug(`Sending chunk starting at index ${chunkIndex}; size: ${chunk.length}`);
 
             const response = await openai.chat.completions.create(requestPayload);
             const content = response.choices[0].message.content?.trim() || '{}';
             const jsonResponse = JSON.parse(content);
 
-            logger.debug(`Received batch starting at index ${batchIndex}; size: ${jsonResponse.data?.length}`);
+            logger.debug(`Received chunk starting at index ${chunkIndex}; size: ${jsonResponse.data?.length}`);
             logger.debug(`Usage: ${JSON.stringify(response.usage)}`);
 
             // Validate the response
@@ -89,12 +89,12 @@ async function processBatch(batch: Record<string, string>[], systemPrompt: strin
 
             return jsonResponse.data;
         } catch (error) {
-            logger.error(`Batch ${batchIndex} failed on attempt ${attempt + 1}: ${error}`);
+            logger.error(`Chunk ${chunkIndex} failed on attempt ${attempt + 1}: ${error}`);
             attempt++;
         }
     }
 
-    throw new Error(`Batch ${batchIndex} failed after ${CONFIG.MAX_RETRY_ATTEMPTS} retries.`);
+    throw new Error(`Chunk ${chunkIndex} failed after ${CONFIG.MAX_RETRY_ATTEMPTS} retries.`);
 }
 
 /**
@@ -179,17 +179,17 @@ export async function POST(req: NextRequest) {
         logger.debug(`systemPrompt: \n${systemPrompt}`);
         logger.debug(`userPrompt: \n${userPrompt}`);
 
-        // Process data in batches
-        const batchPromises: Promise<Record<string, string>[]>[] = [];
+        // Process data in chunks
+        const chunkPromises: Promise<Record<string, string>[]>[] = [];
 
-        for (let i = 0; i < data.length; i += CONFIG.BATCH_SIZE) {
-            const batch = data.slice(i, Math.min(i + CONFIG.BATCH_SIZE, data.length));
-            batchPromises.push(processBatch(batch, systemPrompt, userPrompt, i));
+        for (let i = 0; i < data.length; i += CONFIG.TRANSFORM_CHUNK_SIZE) {
+            const chunk = data.slice(i, Math.min(i + CONFIG.TRANSFORM_CHUNK_SIZE, data.length));
+            chunkPromises.push(processChunk(chunk, systemPrompt, userPrompt, i));
         }
 
-        // Wait for all batches to complete
-        const batchResults = await Promise.all(batchPromises);
-        const transformedResults = batchResults.flat();
+        // Wait for all chunks to complete
+        const chunkResults = await Promise.all(chunkPromises);
+        const transformedResults = chunkResults.flat();
 
         logger.debug(`Transformed results: ${transformedResults.length}`);
 
