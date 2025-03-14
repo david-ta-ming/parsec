@@ -5,7 +5,7 @@ import logger from '@/utils/logger';
 // Configuration constants
 const CONFIG = {
     MAX_RETRY_ATTEMPTS: 3,
-    BATCH_SIZE: 3,
+    BATCH_SIZE: 5,
     MODEL: process.env.OPENAI_MODEL || 'gpt-4o-mini',
     API_KEY: process.env.OPENAI_API_KEY || ''
 };
@@ -33,34 +33,22 @@ interface TransformResponse {
  * Builds the system prompt for OpenAI
  */
 function buildSystemPrompt(transformationPrompt: string): string {
-    return `You are a data transformation assistant. Your task is to transform each row of data according to these instructions: "${transformationPrompt}".
-Follow these strict rules:
-1. Transform the data as per the user's instructions.
-2. The input data will be provided as JSON objects where each object represents a row with column headers as keys.
-3. Return the transformed data in the same JSON format with column headers as keys.
-4. Maintain the same number of columns for each row unless explicitly instructed to add or remove columns.
-5. DO NOT add any explanations or comments in your response.
-6. Your response must be a valid JSON object with a 'data' field containing an array of transformed row objects.`;
+    return `Transform each row of data according to: "${transformationPrompt}".
+Rules:
+1. Input: JSON objects with column headers as keys
+2. Output: Same JSON format with headers as keys 
+3. Maintain column count unless instructed otherwise
+4. Return only valid JSON with a 'data' field containing transformed row objects
+5. No explanations or comments`;
 }
 
 /**
- * Builds the user prompt for OpenAI with examples
+ * Builds the user prompt for OpenAI
  */
-function buildUserPrompt(headers: string[], exampleRows: Record<string, string>[], hasHeaders: boolean): string {
-    const dataStructure = {
-        headers,
-        exampleRows,
-        hasOriginalHeaders: hasHeaders
-    };
-
-    let prompt = `Here is the data structure in JSON format:
-${JSON.stringify(dataStructure, null, 2)}`;
-
-    if (!hasHeaders) {
-        prompt += `\n(Note: The headers were auto-generated because the original file had no headers.)`;
-    }
-
-    return prompt;
+function buildUserPrompt(headers: string[], hasHeaders: boolean): string {
+    return `Headers: ${JSON.stringify(headers)}
+${!hasHeaders ? '(Note: Headers were auto-generated)' : ''}
+Transform the following rows as JSON objects:`;
 }
 
 /**
@@ -75,8 +63,7 @@ async function processBatch(batch: Record<string, string>[], systemPrompt: strin
                 model: CONFIG.MODEL,
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt },
-                    { role: 'user', content: `Transform these rows:\n${JSON.stringify(batch, null, 2)}` }
+                    { role: 'user', content: userPrompt + `\n${JSON.stringify(batch, null, 2)}` }
                 ],
                 temperature: 0, // Use zero temperature for deterministic results
                 max_tokens: 16384,
@@ -186,9 +173,10 @@ export async function POST(req: NextRequest) {
 
         // Build prompts
         const systemPrompt = buildSystemPrompt(transformationPrompt);
-        const exampleRows = data.slice(0, 3);
-        const userPrompt = buildUserPrompt(headers, exampleRows, hasHeaders) +
-            `\n\nInstructions: ${transformationPrompt}\n\nTransform ALL rows according to the instructions. Return the transformed data as a JSON object where each row is represented as an object with column headers as keys.`;
+        const userPrompt = buildUserPrompt(headers, hasHeaders);
+
+        logger.debug(`systemPrompt: \n${systemPrompt}`);
+        logger.debug(`userPrompt: \n${userPrompt}`);
 
         // Process data in batches
         const batchPromises: Promise<Record<string, string>[]>[] = [];
