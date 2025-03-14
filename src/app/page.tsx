@@ -96,6 +96,13 @@ const fetchWithRetry = async (
             // For other error status codes, don't retry
             return response;
         } catch (error) {
+
+            // Check if this is an AbortError (user cancelled)
+            if (error instanceof Error && error.name === 'AbortError') {
+                // Don't retry aborted requests, just propagate the abort
+                throw error;
+            }
+
             // For network errors, retry
             retries++;
             console.warn(`Network error: ${error instanceof Error ? error.message : String(error)}. Retry ${retries}/${MAX_RETRIES}`);
@@ -598,18 +605,15 @@ export default function Home() {
                                 )}
                             </Box>
 
-                            {/* Display loading indicator for non-transformation operations */}
-                            {isLoading && !isTransformingFullData && (
-                                <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-                                    <CircularProgress />
-                                </Box>
-                            )}
-
-                            {fileData && !isLoading && (
+                            {fileData && (
                                 <Box sx={{ width: '100%' }}>
+                                    {/* Fixed height container for the loading indicator to prevent layout shifts */}
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '24px', mb: 2 }}>
+                                        {isLoading && <CircularProgress size={20} />}
+                                    </Box>
+
                                     <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                                        <Tabs value={tabValue} onChange={handleTabChange}
-                                              aria-label="data preview tabs">
+                                        <Tabs value={tabValue} onChange={handleTabChange} aria-label="data preview tabs">
                                             <Tab label="Original Data" />
                                             {transformedData.length > 0 && <Tab label="Transformed Data" />}
                                         </Tabs>

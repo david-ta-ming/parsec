@@ -1,26 +1,29 @@
-# Parsec
+# Parsec: AI-Powered Data Transformation
 
-Parsec is an AI-powered data transformation tool that allows users to transform their data using natural language instructions. Simply upload your data file, describe how you want it transformed, and Parsec will use AI to process your data accordingly.
+Parsec is an intuitive data transformation tool that uses AI to process data based on natural language instructions. Simply upload your data file, describe the transformations you need in plain English, and let Parsec handle the rest.
 
-## Features
+<img src="public/favicon.svg" alt="parsec-logo" width="125"/>
 
-- **Natural Language Transformations**: Describe your transformation needs in plain English
-- **Multiple File Formats**: Upload CSV, TSV, TXT, or Excel files
-- **Data Privacy**: All processing happens in-browser or via secure API calls without storing user data
-- **Transformation Preview**: See how your data will be transformed before applying changes to all rows
-- **Multiple Output Formats**: Download transformed data as CSV, TSV, JSON, or Excel
-- **Header Detection**: Automatically detects and handles files with or without headers
-- **Batch Processing**: Efficiently processes large datasets in batches
+## 🚀 Key Features
 
-## Technology Stack
+- **Natural Language Processing**: Transform your data by describing what you want in plain English
+- **Multiple File Formats**: Support for CSV, TSV, TXT, and Excel files
+- **Privacy-First Approach**: Your data is never stored permanently - it's only processed temporarily
+- **Interactive Preview**: See a sample of your transformed data before processing the entire file
+- **Multiple Export Options**: Download your transformed data as CSV, TSV, JSON, or Excel
+- **Smart Header Detection**: Automatic handling of files with or without headers
+- **Efficient Processing**: Large datasets are handled through intelligent batching
+
+## 🔧 Technology Stack
 
 - **Frontend**: React 18, Next.js 14 (App Router), TypeScript
 - **UI Framework**: Material UI v5
 - **AI Processing**: OpenAI API
-- **File Processing**: SheetJS (xlsx)
-- **Deployment**: Compatible with AWS Amplify
+- **File Processing**: SheetJS, PapaParse
+- **State Management**: React Hooks
+- **Deployment**: AWS Amplify compatible
 
-## Getting Started
+## 🛠️ Getting Started
 
 ### Prerequisites
 
@@ -41,110 +44,113 @@ Parsec is an AI-powered data transformation tool that allows users to transform 
    yarn install
    ```
 
-3. Create a `.env.local` file in the root directory with your OpenAI API key:
+3. Set up environment variables:
+   - Copy `.env.local.example` to `.env.local`
+   - Add your OpenAI API key:
    ```
    OPENAI_API_KEY=your_openai_api_key_here
    ```
 
-4. Run the development server:
+4. Start the development server:
    ```bash
    yarn dev
    ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+5. Open [http://localhost:3000](http://localhost:3000) to view the application
 
-## Usage Guide
+## 📋 How to Use
 
-1. **Upload a File**:
-   - Click the upload area or drag and drop your data file
-   - Use the "File has headers" toggle if your file does or doesn't include column headers
+### 1. Upload Your Data
 
-2. **Describe the Transformation**:
-   - Enter instructions in the text field using natural language
-   - Be specific about the transformations you want to apply to each column
+- Click on the upload area or drag and drop your file
+- Toggle "File has headers" based on your file structure
+- Supported formats: CSV, TSV, TXT, Excel (.xlsx, .xls)
 
-3. **Preview Transformation**:
-   - Click "Preview Transformation" to see a sample of how your data will be transformed
-   - The preview shows up to 10 rows to help you verify the transformation
+### 2. Describe Your Transformation
 
-4. **Download Results**:
-   - Once satisfied with the preview, choose your preferred output format (CSV, TSV, JSON, or Excel)
-   - Click the corresponding button to download the fully transformed dataset
+Write clear instructions for how you want your data transformed. Be specific about changes you want to make to each column.
 
-## Example Transformations
+**Example transformations:**
+- Convert dates from MM/DD/YYYY to YYYY-MM-DD format
+- Format all phone numbers as (XXX) XXX-XXXX
+- Create a new column 'Full Name' by combining 'First Name' and 'Last Name'
+- Calculate the total cost by multiplying 'Quantity' and 'Price'
+- Remove special characters from all text fields
+- Convert all monetary values to numbers by removing currency symbols
 
-Here are some examples of transformations you can request:
+### 3. Preview the Transformation
 
-- "Convert all dates from MM/DD/YYYY to YYYY-MM-DD format"
-- "Format phone numbers as (XXX) XXX-XXXX"
-- "Capitalize all names in the 'Name' column"
-- "Calculate the sum of 'Price' and 'Tax' columns into a new 'Total' column"
-- "Convert all monetary values to numbers by removing dollar signs and commas"
-- "Replace empty values with 'N/A' in all columns"
-- "Round all decimal numbers to two decimal places"
-- "Extract the domain name from all email addresses"
-- "Combine 'First Name' and 'Last Name' columns into a 'Full Name' column"
-- "Convert all temperatures from Fahrenheit to Celsius"
+Click "Preview Transformation" to see a sample of how your data will be transformed. This helps you verify the transformation is working as expected before processing the entire dataset.
 
-## Privacy and Security
+### 4. Download Your Transformed Data
 
-Parsec is designed with privacy as a core principle:
+Once you're satisfied with the preview:
+- Choose your preferred format (CSV, TSV, JSON, or Excel)
+- Click the corresponding download button
+- The full dataset will be processed and downloaded to your device
 
-- **No Data Storage**: Your data is never stored on our servers
-- **Client-Side Processing**: Initial file parsing happens entirely in your browser
-- **Secure API Calls**: Data is securely transmitted to the API for transformation
+## 🔒 Privacy & Security
+
+- **Zero Data Retention**: Your data is never stored on our servers
+- **In-Browser Processing**: Initial file parsing happens in your browser
+- **Secure API Calls**: Data is securely transmitted for AI processing only
 - **No User Accounts**: No personal information is collected
-- **Temporary Processing**: Data is only held in memory during processing and then discarded
+- **Transient Processing**: Data is only held in memory during the transformation process
 
-## Development
-
-### Project Structure
+## 🏗️ Project Structure
 
 ```
 parsec/
 ├── src/
 │   ├── app/                  # Next.js app router pages
 │   │   ├── api/              # API routes
-│   │   │   └── transform/    # Data transformation API
+│   │   │   └── transform/    # Data transformation API endpoint
+│   │   ├── how-to-use/       # How-to-use guide page
 │   │   ├── privacy/          # Privacy policy page
-│   │   ├── terms/            # Terms of service page
-│   │   ├── layout.tsx        # Root layout
+│   │   ├── layout.tsx        # Root layout with theme
 │   │   └── page.tsx          # Main application page
 │   ├── components/           # React components
 │   │   ├── FileUpload.tsx    # File upload component
-│   │   ├── Footer.tsx        # Footer component
-│   │   ├── Header.tsx        # Header component
-│   │   └── ...
-│   ├── theme/                # Material UI theme
+│   │   ├── TransformationPreview.tsx    # Results preview
+│   │   └── ...               # Other UI components
+│   ├── theme/                # Material UI theming
 │   └── utils/                # Utility functions
 │       ├── fileParser.ts     # File parsing utilities
 │       └── logger.ts         # Logging utilities
-├── public/                   # Public assets
-├── .env.local.example        # Example environment variables
 └── ...
 ```
 
-### API Configuration
-
-The application uses OpenAI's API for data transformation. To customize the AI model or parameters, modify the settings in `src/app/api/transform/route.ts`.
-
-### Adding New File Formats
-
-To add support for new file formats, extend the file parsing utilities in `src/utils/fileParser.ts`.
-
-## Deployment
+## 🚢 Deployment
 
 ### AWS Amplify
 
-The project includes an `amplify.yml` configuration file for easy deployment on AWS Amplify. Make sure to set the required environment variables in your Amplify console:
+The project includes an `amplify.yml` configuration file for AWS Amplify deployment. Set these environment variables in your Amplify console:
 
-- `OPENAI_API_KEY`: Your OpenAI API key
-- `LOG_LEVEL`: (Optional) Logging level (default: "info")
+- `OPENAI_API_KEY` (required): Your OpenAI API key
+- `OPENAI_MODEL` (optional): Defaults to "gpt-4o-mini" if not specified
+- `LOG_LEVEL` (optional): Logging level (default: "info")
+- `NEXT_PUBLIC_SUPPORT_EMAIL` (optional): Support email for the footer
+- `NEXT_PUBLIC_GOOGLE_VERIFICATION_CODE` (optional): For Google Search Console verification
+- `NEXT_PUBLIC_GOOGLE_ANALYTICS_ID` (optional): For Google Analytics integration
 
 ### Other Platforms
 
-For deployment on other platforms like Vercel or Netlify, ensure you set the required environment variables according to the platform's documentation.
+For deployment on Vercel, Netlify, or other platforms, configure the environment variables according to the platform's documentation.
 
-## License
+## 🤝 Contributing
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📜 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+Built with ❤️ using Next.js and OpenAI
