@@ -78,6 +78,7 @@ export default function Home() {
     const [transformProgress, setTransformProgress] = useState<number>(0);
     const [isCancelling, setIsCancelling] = useState<boolean>(false);
     const abortControllerRef = useRef<AbortController | null>(null);
+    const [processedRows, setProcessedRows] = useState<number>(0);
 
     const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
@@ -115,6 +116,7 @@ export default function Home() {
         setTimeout(() => {
             setIsTransformingFullData(false);
             setTransformProgress(0);
+            setProcessedRows(0);
             setIsCancelling(false);
             setError(null);
         }, 500);
@@ -182,6 +184,7 @@ export default function Home() {
             // Set initial states
             setIsTransformingFullData(true);
             setTransformProgress(0);
+            setProcessedRows(0);
             setError(null);
 
             let allTransformedRows: Record<string, string>[] = [];
@@ -201,6 +204,11 @@ export default function Home() {
 
                 // Convert batch to JSON objects
                 const batchObjects = convertArrayToJsonObjects(batch, fileData.headers);
+
+                // Calculate the number of rows processed so far
+                // Use Math.min to ensure we don't show more than the total number of rows
+                const rowsProcessed = Math.min((i + BATCH_SIZE), fileData.data.length);
+                setProcessedRows(rowsProcessed);
 
                 const response = await fetch('/api/transform', {
                     method: 'POST',
@@ -225,9 +233,11 @@ export default function Home() {
 
                 allTransformedRows = [...allTransformedRows, ...result.transformedData];
 
-                // Update progress
+                // Update progress and processed rows
                 const progressPercentage = Math.round((currentBatch / totalBatches) * 100);
                 setTransformProgress(progressPercentage);
+
+
             }
 
             // Add a small delay to show the 100% state before completion
@@ -250,6 +260,7 @@ export default function Home() {
             if (!isCancelling) {
                 setIsTransformingFullData(false);
                 setTransformProgress(0);
+                setProcessedRows(0);
             }
             abortControllerRef.current = null;
         }
@@ -575,6 +586,7 @@ export default function Home() {
             <TransformationProgressModal
                 isOpen={isTransformingFullData}
                 progress={transformProgress}
+                processedRows={processedRows}
                 totalRows={fileData?.data.length || 0}
                 onCancel={handleCancelTransformation}
                 isCancelling={isCancelling}

@@ -13,6 +13,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 interface TransformationProgressModalProps {
     isOpen: boolean;
     progress: number;
+    processedRows: number;
     totalRows: number;
     onCancel: () => void;
     isCancelling: boolean;
@@ -21,6 +22,7 @@ interface TransformationProgressModalProps {
 const TransformationProgressModal: React.FC<TransformationProgressModalProps> = ({
                                                                                      isOpen,
                                                                                      progress,
+                                                                                     processedRows,
                                                                                      totalRows,
                                                                                      onCancel,
                                                                                      isCancelling
@@ -88,7 +90,7 @@ const TransformationProgressModal: React.FC<TransformationProgressModalProps> = 
 
                     {/* Processing information */}
                     <Typography variant="body2" color="text.secondary">
-                        Processing {totalRows.toLocaleString()} rows of data
+                        Processing {processedRows.toLocaleString()}/{totalRows.toLocaleString()} rows of data
                     </Typography>
 
                     {/* Cancel button */}
